@@ -16,9 +16,15 @@ import {
 } from './airfrance-api.js'
 import { getAirFranceStations } from './airfrance.js'
 import { describeAirFranceTransportError } from './af/transport-errors.js'
+import { isAllowedOrigin, isLocalHost } from './local-guard.js'
 
 const app = Fastify({ logger: true })
-await app.register(cors, { origin: true })
+await app.register(cors, { origin: (origin, done) => done(null, isAllowedOrigin(origin)) })
+app.addHook('onRequest', async (request, reply) => {
+  if (!isLocalHost(request.headers.host) || !isAllowedOrigin(request.headers.origin)) {
+    return reply.code(403).send({ error: 'Local callers only' })
+  }
+})
 
 const stationSchema = z.object({
   code: z.string(), cityCode: z.string(), cityName: z.string(), countryName: z.string(),
