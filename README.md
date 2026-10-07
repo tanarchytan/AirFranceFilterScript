@@ -1,31 +1,31 @@
-# Ratline — Deal desk Air France
+# Ratline: Air France deal desk
 
-Successeur TypeScript de [AirFranceFilterScript](https://github.com/RemiPelloux/AirFranceFilterScript) : même transport GraphQL / Akamai éprouvé, interface deal desk moderne.
+TypeScript successor to [AirFranceFilterScript](https://github.com/RemiPelloux/AirFranceFilterScript): same proven GraphQL / Akamai transport, modern deal desk interface.
 
-**Ratline** compare les tarifs **euros** et **Miles Flying Blue**, explore les meilleurs jours sur 12 mois, et classe les offres (coût, durée, escales, Pareto) — en local, sans API partenaire.
-
----
-
-## Fonctionnalités
-
-- Recherche aller-retour avec fenêtre flexible (±30 jours, max. 7 repricings exacts)
-- Calendrier mensuel Open Dates A/R (€ et Miles séparés, plancher `totalPriceItinerary`)
-- Mode **Explorer** : Top 3 A/R par mois via un seul calendrier `DAY` (plus de N+1 mensuel)
-- Classement local (coût généralisé + frontière de Pareto)
-- Session Flying Blue importée par cookies (pas de mot de passe / OTP)
-- Collecteur Chrome visible via Patchright (same-origin `fetch`)
-- Pré-chauffage Chrome / Akamai au démarrage API (première recherche plus rapide)
-- Cache live 120 s des captures tarifaires
-- Récupération auto si le profil Chrome est verrouillé (fallback navigateur éphémère)
-- Warm-up Akamai best-effort : un échec ne bloque plus la recherche
+**Ratline** compares **euro** fares and **Flying Blue Miles**, explores the best days over 12 months, and ranks offers (cost, duration, stops, Pareto), all locally, with no partner API.
 
 ---
 
-## Prérequis
+## Features
+
+- Return search with a flexible window (±30 days, max. 7 exact repricings)
+- Monthly Open Dates return calendar (€ and Miles kept separate, `totalPriceItinerary` floor)
+- **Explore** mode: Top 3 return fares per month from a single `DAY` calendar (no more monthly N+1)
+- Local ranking (generalised cost + Pareto frontier)
+- Flying Blue session imported via cookies (no password / OTP handling)
+- Visible Chrome collector via Patchright (same-origin `fetch`)
+- Chrome / Akamai warm-up at API start (faster first search)
+- 120 s live cache of fare captures
+- Automatic recovery when the Chrome profile is locked (ephemeral browser fallback)
+- Best-effort Akamai warm-up: a failure no longer blocks the search
+
+---
+
+## Requirements
 
 - Node.js 22+
 - [pnpm](https://pnpm.io) 11+ (`corepack enable`)
-- Brave (recommandé) ou Google Chrome
+- Brave (recommended) or Google Chrome
 - macOS / Linux / Windows
 
 ---
@@ -41,58 +41,58 @@ pnpm install
 
 ---
 
-## Lancement
+## Running
 
 ```bash
 pnpm dev
 ```
 
-Au démarrage, l’API pré-chauffe Chrome sur `wwws.airfrance.fr`. Laissez la fenêtre ouverte — le mode headless est refusé par Akamai.
+On start, the API warms up Chrome on `wwws.airfrance.fr`. Leave the window open: Akamai rejects headless mode.
 
 | Service | URL |
 | --- | --- |
-| Interface | http://127.0.0.1:5173 |
+| UI | http://127.0.0.1:5173 |
 | API | http://127.0.0.1:8787 |
 
-Si le port 8787 est déjà pris, ou si Chrome refuse le profil (message « session existante »), arrêtez les anciens `pnpm dev` / Chrome liés au projet puis relancez :
+If port 8787 is already taken, or if Chrome refuses the profile ("existing session" message), stop any old `pnpm dev` / Chrome instances tied to the project, then restart:
 
 ```bash
-# macOS / Linux — libérer les ports puis relancer
+# macOS / Linux: free the ports, then restart
 lsof -ti:5173,8787 | xargs kill -9 2>/dev/null
 pnpm dev
 ```
 
 ---
 
-## Utilisation
+## Usage
 
-1. Choisir origine / destination (autocomplétion stations Air France)
-2. Dates, cabine, mode de paiement : **euros**, **Miles** ou **les deux**
-3. **Rechercher** pour les offres exactes, ou **Explorer** pour le Top 3 / mois
-4. Cliquer un mois ou un jour pour repricer l’aller-retour
+1. Pick origin / destination (Air France station autocomplete)
+2. Dates, cabin, payment mode: **euros**, **Miles** or **both**
+3. **Search** for exact offers, or **Explore** for the monthly Top 3
+4. Click a month or a day to reprice the return trip
 
-### Session Flying Blue (Miles)
+### Flying Blue session (Miles)
 
-Quand vous activez **Miles** / **Comparer**, Ratline ouvre Chrome sur la connexion Air France et attend. Connectez-vous (Flying Blue / OTP), puis cliquez **Je suis connecté** pour vérifier la session et récupérer les cookies du profil navigateur.
+When you enable **Miles** / **Compare**, Ratline opens Chrome on the Air France login page and waits. Log in (Flying Blue / OTP), then click **I'm logged in** to verify the session and collect the browser profile cookies.
 
-Optionnel — importer des cookies déjà exportés :
+Optional: import cookies you have already exported:
 
 ```bash
-pnpm session:import -- /chemin/vers/cookies.json
+pnpm session:import -- /path/to/cookies.json
 ```
 
-Les cookies vivent dans `.airfrance-browser-profile/` (gitignoré). Endpoints : `POST /api/auth/open`, `POST /api/auth/confirm`, `GET /api/auth/status`.
+Cookies live in `.airfrance-browser-profile/` (gitignored). Endpoints: `POST /api/auth/open`, `POST /api/auth/confirm`, `GET /api/auth/status`.
 
 ---
 
-## Vérifications
+## Checks
 
 ```bash
 pnpm test              # parsers + hashcash
 pnpm typecheck
 pnpm build
-pnpm test:live         # smoke cash NCE → RUN (réseau réel)
-pnpm test:reward       # smoke Miles (session requise)
+pnpm test:live         # cash smoke NCE → RUN (real network)
+pnpm test:reward       # Miles smoke (session required)
 ```
 
 ---
@@ -106,70 +106,70 @@ React / Vite (:5173)
 Fastify (:8787)
         │
         ▼
-server/af/  — collecteur Patchright
+server/af/  (Patchright collector)
         │
         ▼
-Chrome visible → wwws.airfrance.fr/gql/v1
+Visible Chrome → wwws.airfrance.fr/gql/v1
 ```
 
-| Couche | Rôle |
+| Layer | Role |
 | --- | --- |
-| `src/` | UI deal desk, ranking, stations |
+| `src/` | Deal desk UI, ranking, stations |
 | `server/index.ts` | API `/api/search`, `/api/explore`, `/api/stations` |
-| `server/af/` | Transport FilterScript, cash, reward, parsers |
-| `server/airfrance.ts` | Catalogue stations (curl HTTP/2) |
+| `server/af/` | FilterScript transport, cash, reward, parsers |
+| `server/airfrance.ts` | Station catalogue (curl HTTP/2) |
 
-### Transport (héritage FilterScript)
+### Transport (inherited from FilterScript)
 
-1. Brave / Chrome visible (Brave en priorité, ou `AF_BROWSER_EXECUTABLE`)
-2. Profil persistant `.airfrance-browser-profile/` (fallback éphémère si verrouillé)
-3. `page.evaluate(fetch)` same-origin, `credentials: 'include'`
-4. URL toujours `operationName=SharedSearchLowestFareOffersForSearchQuery` ; opération réelle dans le body
-5. Warm-up Akamai + refresh + retry sur 403 HTML
-6. Batch Explorer : chunks de 5, concurrence 3, pause 350 ms
+1. Visible Brave / Chrome (Brave first, or `AF_BROWSER_EXECUTABLE`)
+2. Persistent profile `.airfrance-browser-profile/` (ephemeral fallback if locked)
+3. Same-origin `page.evaluate(fetch)`, `credentials: 'include'`
+4. URL always `operationName=SharedSearchLowestFareOffersForSearchQuery`; the real operation is in the body
+5. Akamai warm-up + refresh + retry on HTML 403
+6. Explore batch: chunks of 5, concurrency 3, 350 ms pause
 
 ### Cash vs Miles
 
 | | Cash (LEISURE) | Miles (REWARD) |
 | --- | --- | --- |
-| Contexte | UUID local | `SearchCustomer` + `CreateSearchContext` + passagers PROFILE |
-| Hashcash | non | oui (v2) |
-| Headers révision | non | `x-client-revision` |
-| Hashes défaut | FilterScript (`3129e428…` / `6c2316d3…`) | idem + fallback Ratline août 2026 |
+| Context | Local UUID | `SearchCustomer` + `CreateSearchContext` + PROFILE passengers |
+| Hashcash | no | yes (v2) |
+| Revision headers | no | `x-client-revision` |
+| Default hashes | FilterScript (`3129e428…` / `6c2316d3…`) | same + Ratline August 2026 fallback |
 
 ---
 
-## Variables d'environnement
+## Environment variables
 
-| Variable | Rôle |
+| Variable | Role |
 | --- | --- |
-| `AF_BROWSER_EXECUTABLE` | Chemin Chrome / Brave forcé |
-| `AF_BROWSER_PROFILE` | Dossier profil (défaut `.airfrance-browser-profile`) |
-| `AF_CDP_ENDPOINT` | Attacher un Chrome déjà ouvert |
-| `AF_LOWEST_FARE_HASH` | Surcharge hash LowestFare |
-| `AF_AVAILABLE_OFFERS_HASH` | Surcharge hash AvailableOffers |
-| `AF_CLIENT_REVISION` | Révision client (Reward) |
-| `PORT` | Port API (défaut `8787`) |
+| `AF_BROWSER_EXECUTABLE` | Force a Chrome / Brave path |
+| `AF_BROWSER_PROFILE` | Profile folder (default `.airfrance-browser-profile`) |
+| `AF_CDP_ENDPOINT` | Attach to an already open Chrome |
+| `AF_LOWEST_FARE_HASH` | Override the LowestFare hash |
+| `AF_AVAILABLE_OFFERS_HASH` | Override the AvailableOffers hash |
+| `AF_CLIENT_REVISION` | Client revision (Reward) |
+| `PORT` | API port (default `8787`) |
 
 ---
 
 ## Documentation
 
-- [docs/AIRFRANCE_NETWORK_AUDIT.md](docs/AIRFRANCE_NETWORK_AUDIT.md) — protocole GraphQL vérifié
-- [docs/ETAT_DES_LIEUX_ET_CAHIER_DES_CHARGES.md](docs/ETAT_DES_LIEUX_ET_CAHIER_DES_CHARGES.md) — cahier des charges produit
+- [docs/AIRFRANCE_NETWORK_AUDIT.md](docs/AIRFRANCE_NETWORK_AUDIT.md): verified GraphQL protocol (French)
+- [docs/ETAT_DES_LIEUX_ET_CAHIER_DES_CHARGES.md](docs/ETAT_DES_LIEUX_ET_CAHIER_DES_CHARGES.md): product requirements (French)
 
 ---
 
-## Limites
+## Limits
 
-- Chrome visible obligatoire
-- Un collecteur à la fois (file d’attente locale)
-- Akamai peut bloquer temporairement après trop de requêtes (retry + refresh)
-- Les hashes persistés peuvent changer si Air France met à jour son frontend
-- Pas d’API partenaire publique — usage personnel / local uniquement
+- Visible Chrome is required
+- One collector at a time (local queue)
+- Akamai may block temporarily after too many requests (retry + refresh)
+- Persisted hashes may change if Air France updates its frontend
+- No public partner API: personal / local use only
 
 ---
 
-## Historique
+## History
 
-Ce dépôt a commencé comme un filtre Flask **AF / HOP**. Il est désormais **Ratline** : stack TypeScript (React + Fastify + Patchright), deal desk cash / Miles, transport Akamai héritée de FilterScript, avec récupération automatique des sessions Chrome / warm-up.
+This repo started as an **AF / HOP** Flask filter. It is now **Ratline**: a TypeScript stack (React + Fastify + Patchright), a cash / Miles deal desk, and the Akamai transport inherited from FilterScript, with automatic Chrome session recovery and warm-up.

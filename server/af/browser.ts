@@ -49,7 +49,7 @@ const startBrowserContext = async (): Promise<BrowserContext> => {
 const getCdpBrowser = (): Promise<Browser> => {
   browserPromise ??= (async () => {
     if (!CDP_ENDPOINT || !await cdpIsReady()) {
-      throw new Error(`Le navigateur CDP configuré ne répond pas sur ${CDP_ENDPOINT}`)
+      throw new Error(`The configured CDP browser is not responding on ${CDP_ENDPOINT}`)
     }
     const browser = await chromium.connectOverCDP(CDP_ENDPOINT)
     browser.on('disconnected', () => { browserPromise = undefined })
@@ -65,7 +65,7 @@ export const getBrowserContext = async (): Promise<BrowserContext> => {
   if (CDP_ENDPOINT) {
     const browser = await getCdpBrowser()
     const context = browser.contexts()[0]
-    if (!context) throw new Error('Le profil navigateur Air France est indisponible')
+    if (!context) throw new Error('The Air France browser profile is unavailable')
     return context
   }
   contextPromise ??= startBrowserContext().catch((error) => {
@@ -121,7 +121,7 @@ export const navigateAirFrance = async (
   }
   if (onAirFrance(page)) return
   throw new Error(describeAirFranceTransportError(
-    lastError instanceof Error ? lastError : new Error(`Navigation Air France impossible vers ${url}`),
+    lastError instanceof Error ? lastError : new Error(`Air France navigation failed for ${url}`),
   ))
 }
 

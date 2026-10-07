@@ -130,7 +130,7 @@ const executeCashSearch = async (request: SearchRequest): Promise<SearchCapture>
         }
       } catch (error) {
         hardFailures += 1
-        const detail = error instanceof Error ? error.message.slice(0, 160) : 'erreur offre'
+        const detail = error instanceof Error ? error.message.slice(0, 160) : 'offer error'
         warnings.push(`${candidate.departureDate}: ${detail}`)
         if (candidates.length === 1) {
           const fallback = await priceCandidate(page, candidate, searchStateUuid)
@@ -140,7 +140,7 @@ const executeCashSearch = async (request: SearchRequest): Promise<SearchCapture>
       }
     }
     if (!offers.length && hardFailures > 0) {
-      warnings.unshift('Air France n’a renvoyé aucune offre exploitable pour ces couples de dates.')
+      warnings.unshift('Air France returned no usable offers for these date pairs.')
     }
 
     return {

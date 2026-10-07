@@ -133,7 +133,7 @@ app.post('/api/auth/open', async (request, reply) => {
     return {
       ok: true,
       url,
-      message: 'Chrome ouvert — connectez-vous à Flying Blue, puis cliquez « Je suis connecté » dans Ratline.',
+      message: 'Chrome is open. Log in to Flying Blue, then click “I’m logged in” in Ratline.',
     }
   } catch (error) {
     request.log.warn(error, 'Unable to open Flying Blue login')
@@ -152,7 +152,7 @@ app.post('/api/auth/confirm', async (request, reply) => {
         ok: false,
         authenticated: false,
         cookieCount: session.cookieCount,
-        error: 'Session Flying Blue introuvable. Terminez la connexion dans Chrome, puis réessayez.',
+        error: 'Flying Blue session not found. Finish logging in in Chrome, then try again.',
       })
     }
     return {
@@ -160,7 +160,7 @@ app.post('/api/auth/confirm', async (request, reply) => {
       authenticated: true,
       cookieCount: session.cookieCount,
       url: session.url,
-      message: `Session Flying Blue prête (${session.cookieCount} cookies Air France).`,
+      message: `Flying Blue session ready (${session.cookieCount} Air France cookies).`,
     }
   } catch (error) {
     request.log.warn(error, 'Unable to confirm Flying Blue session')
@@ -182,7 +182,7 @@ app.get('/api/stations', async (request, reply) => {
     return reply.status(503).send({
       source: 'live',
       results: [],
-      error: 'Le référentiel Air France ne répond pas. Aucun aéroport local n’a été substitué.',
+      error: 'The Air France reference service is not responding. No local airport was substituted.',
     })
   }
 
@@ -192,7 +192,7 @@ app.get('/api/stations', async (request, reply) => {
     .sort((a, b) => {
       const exactA = normalized(a.code) === needle || normalized(a.cityName) === needle ? -1 : 0
       const exactB = normalized(b.code) === needle || normalized(b.cityName) === needle ? -1 : 0
-      return exactA - exactB || a.cityName.localeCompare(b.cityName, 'fr')
+      return exactA - exactB || a.cityName.localeCompare(b.cityName, 'en')
     })
     .slice(0, 12)
   return { source: 'live', results }
@@ -200,7 +200,7 @@ app.get('/api/stations', async (request, reply) => {
 
 app.post('/api/explore', async (request, reply) => {
   const parsed = exploreSchema.safeParse(request.body)
-  if (!parsed.success) return reply.status(400).send({ error: 'Aéroports invalides', issues: parsed.error.issues })
+  if (!parsed.success) return reply.status(400).send({ error: 'Invalid airports', issues: parsed.error.issues })
   const startedAt = performance.now()
   const searchRequest = explorationRequest(parsed.data.origin as Station, parsed.data.destination as Station, parsed.data.paymentMode)
   const warnings: string[] = []
@@ -219,11 +219,11 @@ app.post('/api/explore', async (request, reply) => {
         rewardMonths = reward.months
         rewardCacheHit = reward.cacheHit
         operations.push(...reward.operations)
-        if (!rewardMonths.length) warnings.push('Air France n’a retourné aucun calendrier Miles pour cette route.')
+        if (!rewardMonths.length) warnings.push('Air France returned no Miles calendar for this route.')
       } catch (error) {
         if (!(error instanceof FlyingBlueAuthError)) throw error
         authRequired = true
-        warnings.push('Connexion Flying Blue requise pour les Miles — une fenêtre Chrome a été ouverte.')
+        warnings.push('Flying Blue login required for Miles: a Chrome window has been opened.')
       }
     }
     months = mergeExploreMonths(cash.months, rewardMonths)
@@ -236,7 +236,7 @@ app.post('/api/explore', async (request, reply) => {
     status = error instanceof FlyingBlueAuthError ? 'auth-required' : 'blocked'
     authRequired = error instanceof FlyingBlueAuthError
     warnings.push(error instanceof FlyingBlueAuthError
-      ? 'Connexion Flying Blue requise — connectez-vous dans la fenêtre Chrome, puis relancez.'
+      ? 'Flying Blue login required: log in in the Chrome window, then search again.'
       : describeAirFranceTransportError(error))
   }
   return {
@@ -256,9 +256,9 @@ app.post('/api/search', async (request, reply) => {
   const parsed = requestSchema.safeParse(request.body)
   if (!parsed.success) {
     const issue = parsed.error.issues[0]
-    const field = issue?.path.join('.') || 'paramètre'
+    const field = issue?.path.join('.') || 'parameter'
     return reply.status(400).send({
-      error: `Recherche invalide · ${field}: ${issue?.message ?? 'valeur incorrecte'}`,
+      error: `Invalid search · ${field}: ${issue?.message ?? 'invalid value'}`,
       issues: parsed.error.issues,
     })
   }
@@ -309,7 +309,7 @@ app.post('/api/search', async (request, reply) => {
         if (!(error instanceof FlyingBlueAuthError)) throw error
         if (searchRequest.paymentMode === 'miles') throw error
         authRequired = true
-        warnings.push('Prix euros disponibles — connectez-vous à Flying Blue dans Chrome pour les Miles.')
+        warnings.push('Euro prices available. Log in to Flying Blue in Chrome for Miles.')
       }
     }
 
@@ -325,7 +325,7 @@ app.post('/api/search', async (request, reply) => {
     if (error instanceof FlyingBlueAuthError) {
       status = 'auth-required'
       authRequired = true
-      warnings.push('Connexion Flying Blue requise — connectez-vous dans la fenêtre Chrome, puis relancez.')
+      warnings.push('Flying Blue login required: log in in the Chrome window, then search again.')
     } else {
       request.log.warn(error, 'Live Air France search failed')
       status = 'blocked'
@@ -351,5 +351,5 @@ app.post('/api/search', async (request, reply) => {
 const port = Number(process.env.PORT ?? 8787)
 await app.listen({ host: '127.0.0.1', port })
 void prewarmCollector().catch((error) => {
-  app.log.warn(error, 'Pré-chauffage collecteur Air France échoué (sera retenté à la première recherche)')
+  app.log.warn(error, 'Air France collector warm-up failed (will retry on first search)')
 })

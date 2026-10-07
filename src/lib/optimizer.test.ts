@@ -8,8 +8,8 @@ const station = (code: string, cityName: string): Station => ({
 })
 
 const request: SearchRequest = {
-  origin: station('AAA', 'Départ'),
-  destination: station('DDD', 'Arrivée'),
+  origin: station('AAA', 'Origin'),
+  destination: station('DDD', 'Destination'),
   tripType: 'return',
   departureDate: '2026-09-15',
   returnDate: '2026-09-22',

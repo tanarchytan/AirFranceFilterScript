@@ -45,7 +45,7 @@ const companionsFromContext = (travelers: unknown, adults: number): TravelCompan
   const usable = normalizeTravelers(travelers).filter((traveler) => traveler.travelerKey != null)
   if (!usable.length) {
     throw new FlyingBlueAuthError(
-      'Aucun voyageur Flying Blue dans le profil. Ouvrez une recherche Miles sur airfrance.fr une fois, puis réessayez.',
+      'No Flying Blue traveller in the profile. Run one Miles search on airfrance.fr first, then try again.',
     )
   }
   return usable.slice(0, adults).map((traveler, index) => ({

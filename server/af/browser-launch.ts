@@ -34,7 +34,7 @@ export const findBrowserExecutable = async (): Promise<string> => {
       // Try next candidate.
     }
   }
-  throw new Error('Brave ou Google Chrome est requis pour interroger Air France')
+  throw new Error('Brave or Google Chrome is required to query Air France')
 }
 
 const clearProfileLocks = async (): Promise<void> => {

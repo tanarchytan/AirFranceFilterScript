@@ -148,7 +148,7 @@ export const lowestFareVariables = (
 })
 
 export const datePairLabel = (departureDate: string, returnDate?: string): string => {
-  const formatter = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', timeZone: 'UTC' })
+  const formatter = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })
   const outbound = formatter.format(new Date(`${departureDate}T00:00:00Z`))
   return returnDate ? `${outbound} → ${formatter.format(new Date(`${returnDate}T00:00:00Z`))}` : outbound
 }

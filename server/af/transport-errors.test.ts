@@ -9,7 +9,7 @@ describe('transport-errors', () => {
     const error = new Error('page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at https://wwws.airfrance.fr/')
     expect(isAirFranceNetworkError(error)).toBe(true)
     expect(describeAirFranceTransportError(error)).toMatch(/ERR_HTTP2/)
-    expect(describeAirFranceTransportError(error)).toMatch(/profil/)
+    expect(describeAirFranceTransportError(error)).toMatch(/profile/)
   })
 
   it('detects navigation timeouts', () => {

@@ -120,7 +120,7 @@ const executeRewardSearch = async (request: SearchRequest): Promise<SearchCaptur
           })
         }
       } catch (error) {
-        const detail = error instanceof Error ? error.message.slice(0, 160) : 'erreur Miles'
+        const detail = error instanceof Error ? error.message.slice(0, 160) : 'Miles error'
         warnings.push(`${candidate.departureDate}: ${detail}`)
         if (candidates.length === 1) {
           throw new FlyingBlueAuthError(error instanceof Error ? error.message : undefined)
@@ -128,7 +128,7 @@ const executeRewardSearch = async (request: SearchRequest): Promise<SearchCaptur
       }
     }
     if (!offers.length && warnings.length) {
-      warnings.unshift('Air France n’a renvoyé aucune offre Miles exploitable.')
+      warnings.unshift('Air France returned no usable Miles offers.')
     }
 
     return {

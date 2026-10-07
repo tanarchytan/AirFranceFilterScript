@@ -25,7 +25,7 @@ export const graphQlErrorMessage = (
   .join('; ')
 
 export class FlyingBlueAuthError extends Error {
-  constructor(message = 'Session Flying Blue requise ou expirée') {
+  constructor(message = 'Flying Blue session required or expired') {
     super(message)
     this.name = 'FlyingBlueAuthError'
   }

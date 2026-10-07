@@ -5,7 +5,7 @@ if (!cookieFile) throw new Error('Usage: npm run session:import -- /chemin/vers/
 
 try {
   const imported = await importFlyingBlueSession(cookieFile)
-  console.log(`Session Flying Blue importée dans le profil dédié (${imported} cookies Air France).`)
+  console.log(`Flying Blue session imported into the dedicated profile (${imported} Air France cookies).`)
 } finally {
   await closeAirFranceTransport()
 }

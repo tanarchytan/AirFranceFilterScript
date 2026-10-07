@@ -23,7 +23,7 @@ export const parseMonthlyFares = (
   bookingFlow: BookingFlow,
   tripType: TripType = 'return',
 ): MonthlyFareItem[] => {
-  const formatter = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+  const formatter = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })
   const byMonth = new Map<string, MonthlyFareItem>()
   for (const fare of lowestFares) {
     if (!fare.flightDate || fare.noFlight) continue

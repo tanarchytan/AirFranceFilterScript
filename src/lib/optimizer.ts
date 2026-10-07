@@ -103,8 +103,8 @@ export function rankOffers(
     const route = [offer.segments[0]?.from, ...offer.segments.map((segment) => segment.to)].filter(Boolean)
     const badges = [offer.fareLabel].filter((badge): badge is string => Boolean(badge))
     if (stops === 0) badges.push('Direct')
-    if (offer.source === 'live') badges.push('Prix live')
-    if (!offer.singleTicket) badges.push('Billets séparés')
+    if (offer.source === 'live') badges.push('Live price')
+    if (!offer.singleTicket) badges.push('Separate tickets')
 
     const rankedOffer: RankedOffer = {
       ...offer,

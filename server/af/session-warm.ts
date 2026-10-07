@@ -61,5 +61,5 @@ export const warmAkamaiSession = async (page: Page): Promise<boolean> => {
 /** Open browser + warm Akamai at API boot so the first UI search is faster. */
 export const prewarmCollector = async (): Promise<void> => withTransportLock(async () => {
   const ok = await withRecoveredCollector(async (page) => warmAkamaiSession(page))
-  if (!ok) throw new Error('Warm-up Akamai non confirmé (la recherche retentera)')
+  if (!ok) throw new Error('Akamai warm-up not confirmed (search will retry)')
 })

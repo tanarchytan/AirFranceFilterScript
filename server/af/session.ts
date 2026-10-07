@@ -55,13 +55,13 @@ const cookieFromExport = (cookie: ExportedCookie): BrowserCookie | undefined => 
 
 export const importFlyingBlueSession = async (cookieFile: string): Promise<number> => {
   const raw = JSON.parse(await readFile(resolve(cookieFile), 'utf8')) as unknown
-  if (!Array.isArray(raw)) throw new Error('Le fichier de cookies doit contenir un tableau JSON')
+  if (!Array.isArray(raw)) throw new Error('The cookie file must contain a JSON array')
   const cookies = raw.flatMap((entry): BrowserCookie[] => {
     if (!entry || typeof entry !== 'object') return []
     const cookie = cookieFromExport(entry as ExportedCookie)
     return cookie ? [cookie] : []
   })
-  if (!cookies.length) throw new Error('Aucun cookie Air France valide dans le fichier')
+  if (!cookies.length) throw new Error('No valid Air France cookie in the file')
   const context = await getBrowserContext()
   await context.addCookies(cookies)
   return cookies.length
