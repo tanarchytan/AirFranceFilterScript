@@ -1,5 +1,6 @@
 export type Cabin = 'ECONOMY' | 'PREMIUM' | 'BUSINESS'
 export type PaymentMode = 'cash' | 'miles' | 'both'
+export type TripType = 'return' | 'oneway'
 export type DataSource = 'live'
 export type SearchStatus = 'complete' | 'empty' | 'blocked' | 'auth-required'
 
@@ -17,7 +18,9 @@ export interface Station {
 export interface SearchRequest {
   origin: Station
   destination: Station
+  tripType: TripType
   departureDate: string
+  /** Ignored when tripType is 'oneway'. */
   returnDate: string
   flexibleDays: number
   tripLengthDays: number
@@ -74,7 +77,7 @@ export interface RawOffer {
 
 export interface FareCalendarItem {
   departureDate: string
-  returnDate: string
+  returnDate?: string
   label: string
   cash?: number
   miles?: number

@@ -18,6 +18,7 @@ import {
   datePairLabel,
   lowestFareVariables,
   monthlyInterval,
+  tripDates,
 } from './variables.js'
 
 const cache = new Map<string, { capture: SearchCapture; expiresAt: number }>()
@@ -25,7 +26,7 @@ const inFlight = new Map<string, Promise<SearchCapture>>()
 
 const requestKey = (request: SearchRequest): string => [
   'REWARD',
-  request.origin.code, request.destination.code, request.departureDate, request.returnDate,
+  request.origin.code, request.destination.code, request.tripType, request.departureDate, request.returnDate,
   request.flexibleDays, request.tripLengthDays, request.adults, [...request.cabins].sort().join(','),
 ].join('|')
 
@@ -54,6 +55,7 @@ const executeRewardSearch = async (request: SearchRequest): Promise<SearchCaptur
     const monthlyCalendar = parseMonthlyFares(
       monthlyPayload.data?.lowestFareOffers?.lowestOffers ?? [],
       'REWARD',
+      request.tripType,
     )
 
     let candidates = candidateRequests(request)
@@ -103,16 +105,15 @@ const executeRewardSearch = async (request: SearchRequest): Promise<SearchCaptur
         continue
       }
       try {
-        const parsed = parseAvailableOffers(result.data, new Date().toISOString(), candidate)
+        const parsed = parseAvailableOffers(result.data, new Date().toISOString(), tripDates(candidate))
         offers.push(...parsed)
         const prices = parsed.flatMap((offer) => offer.prices)
           .filter((price) => request.cabins.includes(price.cabin) && price.miles != null)
         const best = prices.sort((left, right) => (left.miles ?? Infinity) - (right.miles ?? Infinity))[0]
         if (best) {
           fareCalendar.push({
-            departureDate: candidate.departureDate,
-            returnDate: candidate.returnDate,
-            label: datePairLabel(candidate.departureDate, candidate.returnDate),
+            ...tripDates(candidate),
+            label: datePairLabel(candidate.departureDate, tripDates(candidate).returnDate),
             miles: best.miles,
             taxes: best.taxes,
             selected: candidate.departureDate === request.departureDate,

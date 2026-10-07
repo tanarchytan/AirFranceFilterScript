@@ -3,6 +3,8 @@ import {
   availableOfferVariables,
   contextPassengersVariables,
   contextStation,
+  datePairLabel,
+  lowestFareVariables,
   requestCommercialCabins,
 } from './variables.js'
 import type { SearchRequest } from '../../src/types.js'
@@ -16,6 +18,7 @@ const sampleRequest = (cabins: SearchRequest['cabins']): SearchRequest => ({
     code: 'NYC', cityCode: 'NYC', cityName: 'New York', countryName: 'US',
     displayText: 'NYC', stationType: 'CITY', isOrigin: true, isDestination: true,
   },
+  tripType: 'return',
   departureDate: '2026-09-01',
   returnDate: '2026-09-11',
   flexibleDays: 0,
@@ -90,3 +93,35 @@ describe('contextStation / ContextPassengers', () => {
   })
 })
 
+
+describe('one-way requests', () => {
+  const oneWay = (): SearchRequest => ({ ...sampleRequest(['ECONOMY']), tripType: 'oneway' })
+
+  it('sends a single outbound connection in every builder', () => {
+    expect(availableOfferVariables(oneWay(), 'uuid', 'REWARD').availableOfferRequestBody.requestedConnections)
+      .toHaveLength(1)
+    expect(contextPassengersVariables(oneWay(), 'uuid', 'REWARD').searchContextPassengersRequest.requestedConnections)
+      .toHaveLength(1)
+    const lowest = lowestFareVariables(oneWay(), 'uuid', 'REWARD', '2026-09-01', '2026-09-30')
+    expect(lowest.lowestFareOffersRequest.requestedConnections).toEqual([
+      {
+        departureDate: '2026-09-01',
+        dateInterval: '2026-09-01/2026-09-30',
+        origin: { type: 'AIRPORT', code: 'NCE' },
+        destination: { type: 'CITY', code: 'NYC' },
+      },
+    ])
+  })
+
+  it('keeps the return leg for round trips', () => {
+    const lowest = lowestFareVariables(sampleRequest(['ECONOMY']), 'uuid', 'REWARD', '2026-09-01', '2026-09-30')
+    expect(lowest.lowestFareOffersRequest.requestedConnections).toHaveLength(2)
+    expect(availableOfferVariables(sampleRequest(['ECONOMY']), 'uuid', 'REWARD').availableOfferRequestBody.requestedConnections)
+      .toHaveLength(2)
+  })
+
+  it('labels a one-way date without an arrow', () => {
+    expect(datePairLabel('2026-09-01')).not.toContain('→')
+    expect(datePairLabel('2026-09-01', '2026-09-11')).toContain('→')
+  })
+})

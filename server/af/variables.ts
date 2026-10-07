@@ -9,6 +9,11 @@ export const addDays = (isoDate: string, days: number): string => {
 
 const stationType = (value: string): 'CITY' | 'AIRPORT' => value === 'CITY' ? 'CITY' : 'AIRPORT'
 
+export const isOneWay = (request: Pick<SearchRequest, 'tripType'>): boolean => request.tripType === 'oneway'
+
+/** Return-leg entries only for round trips; spread into requestedConnections. */
+const returnLeg = <T>(request: SearchRequest, leg: () => T): T[] => (isOneWay(request) ? [] : [leg()])
+
 /** ContextPassengers uses nested city/airport — CITY codes as airport: NYC → 9000. */
 export const contextStation = (station: { code: string; stationType: string }) => (
   stationType(station.stationType) === 'CITY'
@@ -66,12 +71,12 @@ export const availableOfferVariables = (
         destination: { code: request.destination.code, type: stationType(request.destination.stationType) },
         departureDate: request.departureDate,
       },
-      {
+      ...returnLeg(request, () => ({
         origin: { code: request.destination.code, type: stationType(request.destination.stationType) },
         destination: { code: request.origin.code, type: stationType(request.origin.stationType) },
         departureDate: request.returnDate,
         dateInterval: `${addDays(request.returnDate, -3)}/${addDays(request.returnDate, 3)}`,
-      },
+      })),
     ],
     bookingFlow,
     ...rewardCustomer(request, bookingFlow, companions),
@@ -93,11 +98,11 @@ export const contextPassengersVariables = (
         destination: contextStation(request.destination),
         departureDate: request.departureDate,
       },
-      {
+      ...returnLeg(request, () => ({
         origin: contextStation(request.destination),
         destination: contextStation(request.origin),
         departureDate: request.returnDate,
-      },
+      })),
     ],
     bookingFlow,
     commercialCabins: requestCommercialCabins(request.cabins),
@@ -130,11 +135,11 @@ export const lowestFareVariables = (
         origin: { type: stationType(request.origin.stationType), code: request.origin.code },
         destination: { type: stationType(request.destination.stationType), code: request.destination.code },
       },
-      {
+      ...returnLeg(request, () => ({
         dateInterval: null,
         origin: { type: stationType(request.destination.stationType), code: request.destination.code },
         destination: { type: stationType(request.origin.stationType), code: request.origin.code },
-      },
+      })),
     ],
   },
   activeConnection: 0,
@@ -142,10 +147,18 @@ export const lowestFareVariables = (
   bookingFlow,
 })
 
-export const datePairLabel = (departureDate: string, returnDate: string): string => {
+export const datePairLabel = (departureDate: string, returnDate?: string): string => {
   const formatter = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', timeZone: 'UTC' })
-  return `${formatter.format(new Date(`${departureDate}T00:00:00Z`))} → ${formatter.format(new Date(`${returnDate}T00:00:00Z`))}`
+  const outbound = formatter.format(new Date(`${departureDate}T00:00:00Z`))
+  return returnDate ? `${outbound} → ${formatter.format(new Date(`${returnDate}T00:00:00Z`))}` : outbound
 }
+
+/** Dates that describe the trip: no return date for one-way. */
+export const tripDates = (request: SearchRequest): { departureDate: string; returnDate?: string } => (
+  isOneWay(request)
+    ? { departureDate: request.departureDate }
+    : { departureDate: request.departureDate, returnDate: request.returnDate }
+)
 
 export const monthlyInterval = (departureDate: string): [string, string] => {
   const start = new Date(`${departureDate.slice(0, 7)}-01T00:00:00Z`)

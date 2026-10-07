@@ -89,6 +89,15 @@ describe('Air France GraphQL protocol', () => {
     ])
   })
 
+  it('uses the one-way price, not the itinerary floor, for one-way months', () => {
+    expect(parseMonthlyFares([
+      { flightDate: '2026-12-07', totalPrice: 30000, totalPriceItinerary: 95000 },
+      { flightDate: '2026-12-19', totalPrice: 28000, totalPriceItinerary: 115000 },
+    ], 'REWARD', 'oneway')).toEqual([
+      expect.objectContaining({ month: '2026-12', milesFlightDate: '2026-12-19', miles: 28000 }),
+    ])
+  })
+
   it('selects the three cheapest distinct round-trip days and ignores invalid calendar rows', () => {
     expect(parseDailyTopFares([
       { flightDate: '2026-12-01', totalPrice: 42000, totalPriceItinerary: 90000, totalTaxDetails: { totalPrice: 73.2 } },

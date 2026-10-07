@@ -24,7 +24,7 @@ and upstream-friendly where possible (config via env, defaults unchanged for `fr
 1. [x] CORS allowlist (vite origin) + Host check on the API.
 2. [x] `server/af/market.ts`: one market object (host, country, language), `AF_MARKET` env,
        fork default `nl`. Replace hardcodes. Read revision from page at runtime.
-3. [ ] One-way: `tripType` in `src/types.ts` + zod schema + builders + parsers.
+3. [x] One-way: `tripType` in `src/types.ts` + zod schema + builders + parsers.
 4. [ ] Miles calendar: endpoint returning every day (miles, taxes) for N adults, one-way or
        return, over a date range (MONTH + DAY per month), CSV download in the UI.
 5. [ ] Backoff: jitter, re-warm after 403, cooldown after repeated 403s.

@@ -35,6 +35,7 @@ const dateOffset = (days: number) => {
 const initialRequest: SearchRequest = {
   origin: initialOrigin,
   destination: initialDestination,
+  tripType: 'return',
   departureDate: dateOffset(45),
   returnDate: dateOffset(55),
   flexibleDays: 3,
@@ -273,7 +274,7 @@ const OfferRow = memo(function OfferRow({ offer, baseline }: { offer: RankedOffe
         </div>
       </button>
       <div className="offer-badges">
-        {offer.departureDate && offer.returnDate && <span>{readableDate(offer.departureDate)} → {readableDate(offer.returnDate)}</span>}
+        {offer.departureDate && <span>{readableDate(offer.departureDate)}{offer.returnDate ? ` → ${readableDate(offer.returnDate)}` : ''}</span>}
         {offer.badges.map((badge) => <span key={badge}>{badge}</span>)}
         {offer.paretoOptimal && <span className="pareto-badge"><Sparkles size={12} /> Pareto</span>}
       </div>
@@ -446,7 +447,7 @@ function FareCalendar({ items, request }: { items: SearchResponse['fareCalendar'
   return (
     <section className="fare-calendar" aria-label="Couples de dates tarifés par Air France">
       <div className="calendar-heading">
-        <div><span>Pricings exacts Air France</span><strong>{request.tripLengthDays} jours sur place</strong></div>
+        <div><span>Pricings exacts Air France</span><strong>{request.tripType === 'oneway' ? 'Aller simple' : `${request.tripLengthDays} jours sur place`}</strong></div>
         <small>{items.length} couple{items.length > 1 ? 's' : ''} vérifié{items.length > 1 ? 's' : ''} · fenêtre ±{request.flexibleDays} j</small>
       </div>
       <div className="calendar-bars">
@@ -754,7 +755,7 @@ function App() {
   }
 
   const copySearch = async () => {
-    const text = `${request.origin.code} → ${request.destination.code} · ${readableDate(request.departureDate)} au ${readableDate(request.returnDate)} · ${request.cabins.map((cabin) => cabinLabels[cabin]).join(', ')}`
+    const text = `${request.origin.code} → ${request.destination.code} · ${readableDate(request.departureDate)}${request.tripType === 'oneway' ? ' · aller simple' : ` au ${readableDate(request.returnDate)}`} · ${request.cabins.map((cabin) => cabinLabels[cabin]).join(', ')}`
     await navigator.clipboard.writeText(text)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1800)
@@ -835,15 +836,24 @@ function App() {
               </select><ChevronDown size={15} /></div>
             </label>}
 
-            {searchMode === 'search' && <><div className="field-row dates-row">
+            {searchMode === 'search' && <><div className="mode-section">
+              <span>Trajet</span>
+              <div className="segmented-control">
+                {([['return', 'Aller-retour'], ['oneway', 'Aller simple']] as const).map(([tripType, label]) => (
+                  <button key={tripType} type="button" className={request.tripType === tripType ? 'active' : ''} onClick={() => patchRequest('tripType', tripType)}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="field-row dates-row">
               <label><span>Aller cible</span><div className="compact-input"><CalendarDays size={16} /><SafeDateInput key={`departure-${request.departureDate}`} value={request.departureDate} min={dateOffset(1)} onCommit={setDepartureDate} /></div></label>
-              <label><span>Retour</span><div className="compact-input"><CalendarDays size={16} /><SafeDateInput key={`return-${request.returnDate}`} value={request.returnDate} min={request.departureDate} disabled={request.flexibleDays > 0} onCommit={(value) => patchRequest('returnDate', value)} /></div></label>
+              {request.tripType === 'return' && <label><span>Retour</span><div className="compact-input"><CalendarDays size={16} /><SafeDateInput key={`return-${request.returnDate}`} value={request.returnDate} min={request.departureDate} disabled={request.flexibleDays > 0} onCommit={(value) => patchRequest('returnDate', value)} /></div></label>}
             </div>
 
             <div className="flex-controls">
               <label className="check-line"><input type="checkbox" checked={request.flexibleDays > 0} onChange={(event) => setFlexibleDays(event.target.checked ? 3 : 0)} /><span><Check size={12} /></span>Dates flexibles</label>
               <label><span>Fenêtre</span><div className="compact-input"><input type="number" min="1" max="30" disabled={!request.flexibleDays} value={request.flexibleDays || 3} onChange={(event) => setFlexibleDays(Math.min(30, Math.max(1, Number(event.target.value) || 1)))} /><small>± j</small></div></label>
-              <label><span>Séjour</span><div className="compact-input"><input type="number" min="1" max="30" value={request.tripLengthDays} onChange={(event) => setTripLength(Number(event.target.value))} /><small>j</small></div></label>
+              {request.tripType === 'return' && <label><span>Séjour</span><div className="compact-input"><input type="number" min="1" max="30" value={request.tripLengthDays} onChange={(event) => setTripLength(Number(event.target.value))} /><small>j</small></div></label>}
             </div>
 
             <div className="field-row">
@@ -901,7 +911,7 @@ function App() {
                 : response ? `${ranked.length} itinéraires Air France` : 'Cockpit de comparaison live'}</h2>
               <p>{searchMode === 'explore'
                 ? `Top 3 des prix aller-retour par mois · ${explorePaymentMode === 'both' ? 'Euros + Miles' : 'Euros'} · Economy · 1 adulte`
-                : <>{readableDate(request.departureDate)} — {readableDate(request.returnDate)}{request.flexibleDays ? ` · ±${request.flexibleDays} j · séjour ${request.tripLengthDays} j` : ''} · {request.adults} voyageur{request.adults > 1 ? 's' : ''} · {request.cabins.map((cabin) => cabinLabels[cabin]).join(', ')}</>}</p>
+                : <>{readableDate(request.departureDate)}{request.tripType === 'oneway' ? ' · aller simple' : ` — ${readableDate(request.returnDate)}`}{request.flexibleDays ? ` · ±${request.flexibleDays} j${request.tripType === 'oneway' ? '' : ` · séjour ${request.tripLengthDays} j`}` : ''} · {request.adults} voyageur{request.adults > 1 ? 's' : ''} · {request.cabins.map((cabin) => cabinLabels[cabin]).join(', ')}</>}</p>
             </div>
             <div className="header-actions">
               <button type="button" className="icon-button" title="Actualiser" onClick={searchMode === 'explore' ? runExplore : runSearch} disabled={loading || !routeReady}><RefreshCw size={17} /></button>

@@ -34,6 +34,7 @@ const stationSchema = z.object({
 const requestSchema = z.object({
   origin: stationSchema,
   destination: stationSchema,
+  tripType: z.enum(['return', 'oneway']).default('return'),
   departureDate: z.string().date(),
   returnDate: z.string().date(),
   flexibleDays: z.number().int().min(0).max(30),
@@ -93,6 +94,7 @@ const isoDateOffset = (days: number): string => {
 const explorationRequest = (origin: Station, destination: Station, paymentMode: 'cash' | 'both'): SearchRequest => ({
   origin,
   destination,
+  tripType: 'return',
   departureDate: isoDateOffset(1),
   returnDate: isoDateOffset(11),
   flexibleDays: 0,

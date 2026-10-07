@@ -1,4 +1,4 @@
-import type { Cabin, CabinPrice, ExploreFare, MonthlyFareItem, RawOffer, SearchRequest } from '../../src/types.js'
+import type { Cabin, CabinPrice, ExploreFare, MonthlyFareItem, RawOffer, SearchRequest, TripType } from '../../src/types.js'
 import { MAX_EXACT_DATE_PAIRS } from './hashes.js'
 import { graphQlErrorMessage } from './hashcash.js'
 import type { AvailableOffersPayload, BookingFlow, LowestFareOffer } from './types.js'
@@ -10,20 +10,24 @@ const cabinFromApi = (value?: string): Cabin | undefined => {
   return undefined
 }
 
-/** Prefer round-trip Open Dates floor (`totalPriceItinerary`); fall back to outbound. */
-const roundTripFloor = (fare: LowestFareOffer): number | undefined => (
-  fare.totalPriceItinerary ?? fare.totalPrice
+/**
+ * Round trip: prefer the Open Dates floor (`totalPriceItinerary`), fall back to outbound.
+ * One-way: the outbound price is the whole trip.
+ */
+const tripFloor = (fare: LowestFareOffer, tripType: TripType = 'return'): number | undefined => (
+  tripType === 'oneway' ? fare.totalPrice : fare.totalPriceItinerary ?? fare.totalPrice
 )
 
 export const parseMonthlyFares = (
   lowestFares: LowestFareOffer[],
   bookingFlow: BookingFlow,
+  tripType: TripType = 'return',
 ): MonthlyFareItem[] => {
   const formatter = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: 'numeric', timeZone: 'UTC' })
   const byMonth = new Map<string, MonthlyFareItem>()
   for (const fare of lowestFares) {
     if (!fare.flightDate || fare.noFlight) continue
-    const value = roundTripFloor(fare)
+    const value = tripFloor(fare, tripType)
     if (value == null) continue
     const month = fare.flightDate.slice(0, 7)
     const current = byMonth.get(month)
@@ -38,13 +42,13 @@ export const parseMonthlyFares = (
         ? {
           miles: value,
           milesFlightDate: fare.flightDate,
-          itineraryMiles: fare.totalPriceItinerary ?? value,
+          itineraryMiles: tripType === 'oneway' ? value : fare.totalPriceItinerary ?? value,
           taxes: fare.totalTaxDetails?.totalPrice,
         }
         : {
           cash: value,
           cashFlightDate: fare.flightDate,
-          itineraryCash: fare.totalPriceItinerary ?? value,
+          itineraryCash: tripType === 'oneway' ? value : fare.totalPriceItinerary ?? value,
         }),
     })
   }
@@ -59,7 +63,7 @@ export const parseDailyTopFares = (
   const byDate = new Map<string, ExploreFare>()
   for (const fare of lowestFares) {
     if (!fare.flightDate || fare.flightDate < minimumDate || fare.noFlight) continue
-    const price = roundTripFloor(fare)
+    const price = tripFloor(fare)
     if (price == null) continue
     const current = byDate.get(fare.flightDate)
     if (current && current.price <= price) continue
@@ -87,7 +91,7 @@ export const parseDailyTopFaresByMonth = (
     if (!fare.flightDate || fare.flightDate < minimumDate || fare.noFlight) continue
     const month = fare.flightDate.slice(0, 7)
     if (!wanted.has(month)) continue
-    const price = roundTripFloor(fare)
+    const price = tripFloor(fare)
     if (price == null) continue
     const current = byDate.get(fare.flightDate)
     if (current && current.price <= price) continue
@@ -121,7 +125,7 @@ export const selectExactCandidates = (
   if (candidates.length <= MAX_EXACT_DATE_PAIRS) return candidates
   const fareByDate = new Map(lowestFares
     .filter((fare) => fare.flightDate && !fare.noFlight)
-    .map((fare) => [fare.flightDate!, fare.totalPriceItinerary ?? fare.totalPrice ?? Infinity]))
+    .map((fare) => [fare.flightDate!, tripFloor(fare, request.tripType) ?? Infinity]))
   const base = candidates.find((candidate) => candidate.departureDate === request.departureDate)
   const selected = candidates
     .filter((candidate) => candidate !== base)
@@ -134,7 +138,7 @@ export const selectExactCandidates = (
 export const parseAvailableOffers = (
   payload: AvailableOffersPayload,
   verifiedAt = new Date().toISOString(),
-  dates?: Pick<SearchRequest, 'departureDate' | 'returnDate'>,
+  dates?: { departureDate: string; returnDate?: string },
 ): RawOffer[] => {
   if (payload.errors?.length) throw new Error(graphQlErrorMessage(payload.errors))
   if (payload.data?.availableOffers?.code) {

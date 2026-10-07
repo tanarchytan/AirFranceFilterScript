@@ -14,6 +14,7 @@ import {
   datePairLabel,
   lowestFareVariables,
   monthlyInterval,
+  tripDates,
 } from './variables.js'
 
 const cache = new Map<string, { capture: SearchCapture; expiresAt: number }>()
@@ -22,7 +23,7 @@ const hashes = createActiveHashes()
 
 const requestKey = (request: SearchRequest): string => [
   'LEISURE',
-  request.origin.code, request.destination.code, request.departureDate, request.returnDate,
+  request.origin.code, request.destination.code, request.tripType, request.departureDate, request.returnDate,
   request.flexibleDays, request.tripLengthDays, request.adults, [...request.cabins].sort().join(','),
 ].join('|')
 
@@ -39,13 +40,12 @@ const priceCandidate = async (
   )]
   const [result] = await postGraphQlBatch<AvailableOffersPayload>(page, bodies)
   if (!result.ok || !result.data) throw new Error(result.error ?? 'AvailableOffers failed')
-  const parsed = parseAvailableOffers(result.data, new Date().toISOString(), candidate)
+  const parsed = parseAvailableOffers(result.data, new Date().toISOString(), tripDates(candidate))
   const prices = parsed.flatMap((offer) => offer.prices).filter((price) => candidate.cabins.includes(price.cabin))
   const best = prices.sort((left, right) => (left.cash ?? Infinity) - (right.cash ?? Infinity))[0]
   const fare = best ? {
-    departureDate: candidate.departureDate,
-    returnDate: candidate.returnDate,
-    label: datePairLabel(candidate.departureDate, candidate.returnDate),
+    ...tripDates(candidate),
+    label: datePairLabel(candidate.departureDate, tripDates(candidate).returnDate),
     ...(best.cash != null ? { cash: best.cash } : {}),
     selected: false,
   } : undefined
@@ -71,6 +71,7 @@ const executeCashSearch = async (request: SearchRequest): Promise<SearchCapture>
     const monthlyCalendar = parseMonthlyFares(
       monthlyPayload.data?.lowestFareOffers?.lowestOffers ?? [],
       'LEISURE',
+      request.tripType,
     )
 
     let candidates = candidateRequests(request)
@@ -114,16 +115,15 @@ const executeCashSearch = async (request: SearchRequest): Promise<SearchCapture>
         continue
       }
       try {
-        const parsed = parseAvailableOffers(result.data, new Date().toISOString(), candidate)
+        const parsed = parseAvailableOffers(result.data, new Date().toISOString(), tripDates(candidate))
         offers.push(...parsed)
         const prices = parsed.flatMap((offer) => offer.prices)
           .filter((price) => request.cabins.includes(price.cabin))
         const best = prices.sort((left, right) => (left.cash ?? Infinity) - (right.cash ?? Infinity))[0]
         if (best) {
           fareCalendar.push({
-            departureDate: candidate.departureDate,
-            returnDate: candidate.returnDate,
-            label: datePairLabel(candidate.departureDate, candidate.returnDate),
+            ...tripDates(candidate),
+            label: datePairLabel(candidate.departureDate, tripDates(candidate).returnDate),
             ...(best.cash != null ? { cash: best.cash } : {}),
             selected: candidate.departureDate === request.departureDate,
           })

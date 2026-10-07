@@ -15,6 +15,7 @@ const station = (code: string, cityName: string): Station => ({
 const request: SearchRequest = {
   origin: station('NCE', 'Nice'),
   destination: station('RUN', 'Saint-Denis de la Réunion'),
+  tripType: 'return',
   departureDate: '2026-10-02',
   returnDate: '2026-10-12',
   flexibleDays: Number(process.env.AF_SMOKE_FLEX_DAYS ?? 0),
