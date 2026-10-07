@@ -1,11 +1,19 @@
+import { ORIGIN } from './market.js'
+
 /** Relative path — same-origin page fetch (FilterScript). */
 export const ENDPOINT_PATH = '/gql/v1'
 /** Absolute URL — iframe-native fetch from about:blank. */
-export const ENDPOINT = 'https://wwws.airfrance.fr/gql/v1'
-export const COLLECTOR_PAGE = 'https://wwws.airfrance.fr/search/advanced'
+export const ENDPOINT = `${ORIGIN}/gql/v1`
+export const COLLECTOR_PAGE = `${ORIGIN}/search/advanced`
 export const SAFE_OPERATION = 'SharedSearchLowestFareOffersForSearchQuery'
 
-export const CLIENT_REVISION = process.env.AF_CLIENT_REVISION
+/** Read from the collector page on load; constant is only a last resort. */
+let liveClientRevision: string | undefined
+export const setClientRevision = (revision: string | undefined): void => {
+  if (revision) liveClientRevision = revision
+}
+export const clientRevision = (): string => process.env.AF_CLIENT_REVISION
+  ?? liveClientRevision
   ?? 'dde95d6e7f7007d3044fb2037a564eba31e0792f'
 
 export const SEARCH_CUSTOMER_HASH = process.env.AF_SEARCH_CUSTOMER_HASH

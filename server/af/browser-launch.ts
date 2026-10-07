@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { access, mkdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium, type Browser, type BrowserContext } from 'patchright'
+import { MARKET } from './market.js'
 
 export const PROFILE_DIR = resolve(process.env.AF_BROWSER_PROFILE ?? '.airfrance-browser-profile')
 
@@ -68,8 +69,8 @@ const launchArgs = ['--no-first-run', '--no-default-browser-check']
 
 const sharedLaunch = async () => ({
   headless: false,
-  locale: 'fr-FR',
-  timezoneId: 'Europe/Paris',
+  locale: MARKET.locale,
+  timezoneId: MARKET.timezoneId,
   viewport: { width: 1280, height: 800 } as const,
   args: launchArgs,
   executablePath: await findBrowserExecutable(),

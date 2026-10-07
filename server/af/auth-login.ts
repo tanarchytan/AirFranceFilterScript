@@ -1,16 +1,17 @@
 import type { Page } from 'patchright'
 import { navigateAirFrance, withRecoveredCollector, withTransportLock } from './browser.js'
 import {
-  CLIENT_REVISION,
+  clientRevision,
   COLLECTOR_PAGE,
   SEARCH_CUSTOMER_HASH,
 } from './hashes.js'
 import { FlyingBlueAuthError } from './hashcash.js'
+import { ORIGIN } from './market.js'
 import { postGraphQl } from './transport.js'
 import type { SearchCustomerPayload } from './types.js'
 
 /** Air France account gateway — redirects to KLM IdP / OTP when needed. */
-export const FLYING_BLUE_LOGIN_URL = 'https://wwws.airfrance.fr/identification'
+export const FLYING_BLUE_LOGIN_URL = `${ORIGIN}/identification`
 
 const probeCustomer = async (page: Page): Promise<boolean> => {
   const payload = await postGraphQl<SearchCustomerPayload>(
@@ -18,7 +19,7 @@ const probeCustomer = async (page: Page): Promise<boolean> => {
     'SearchCustomerForSearchQuery',
     SEARCH_CUSTOMER_HASH,
     { expand: 'memberships_flyingblue' },
-    { withHashcash: false, useRewardHeaders: true, revision: CLIENT_REVISION },
+    { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
   )
   return Boolean(payload.data && !Object.values(payload.data).every((value) => value == null))
 }
@@ -66,7 +67,7 @@ export const confirmFlyingBlueSession = async (): Promise<{
   withRecoveredCollector(async (page) => {
     await page.bringToFront().catch(() => undefined)
     await restoreCollectorPage(page)
-    const cookies = await page.context().cookies('https://wwws.airfrance.fr')
+    const cookies = await page.context().cookies(ORIGIN)
     const cookieCount = cookies.filter((cookie) => /airfrance/i.test(cookie.domain)).length
     try {
       const authenticated = await probeCustomer(page)

@@ -5,7 +5,8 @@ import {
   startEphemeralContext,
   startPersistentContext,
 } from './browser-launch.js'
-import { BROWSER_TIMEOUT_MS, COLLECTOR_PAGE } from './hashes.js'
+import { BROWSER_TIMEOUT_MS, COLLECTOR_PAGE, setClientRevision } from './hashes.js'
+import { ORIGIN, SITE_DOMAIN, parseClientRevision } from './market.js'
 import { describeAirFranceTransportError, isAirFranceNetworkError } from './transport-errors.js'
 
 const CDP_ENDPOINT = process.env.AF_CDP_ENDPOINT
@@ -88,7 +89,7 @@ export const withTransportLock = async <T>(work: () => Promise<T>): Promise<T> =
 }
 
 const onAirFrance = (page: Page): boolean => (
-  page.url().includes('airfrance.fr') || page.url().includes('airfranceklm')
+  page.url().includes(SITE_DOMAIN) || page.url().includes('airfranceklm')
 )
 
 const isHttp2ProtocolError = (error: unknown): boolean => {
@@ -128,8 +129,14 @@ const openCollectorPage = async (context: BrowserContext): Promise<Page> => {
   const page = await context.newPage()
   await page.setViewportSize({ width: 1280, height: 800 })
   await navigateAirFrance(page, COLLECTOR_PAGE, 3_000)
+  await captureClientRevision(page)
   await page.mouse.move(220, 320)
   return page
+}
+
+/** The site ships its client revision in page config; requests must send the live one. */
+const captureClientRevision = async (page: Page): Promise<void> => {
+  setClientRevision(parseClientRevision(await page.content().catch(() => '')))
 }
 
 const pageIsResponsive = async (page: Page): Promise<boolean> => {
@@ -161,7 +168,7 @@ const recoverPoisonedProfile = async (): Promise<void> => {
 
 const getCollectorPage = async (): Promise<Page> => {
   const context = await getBrowserContext()
-  const airFrancePages = context.pages().filter((page) => page.url().startsWith('https://wwws.airfrance.fr/'))
+  const airFrancePages = context.pages().filter((page) => page.url().startsWith(`${ORIGIN}/`))
   let page: Page | undefined
   for (const candidate of airFrancePages) {
     if (await pageIsResponsive(candidate)) {
@@ -216,6 +223,7 @@ export const refreshCollectorPage = async (page: Page): Promise<void> => {
     // Keep going; Akamai cookies may still refresh partially.
   }
   await page.waitForTimeout(2_500)
+  await captureClientRevision(page)
 }
 
 // Re-export for session cleanup scripts.

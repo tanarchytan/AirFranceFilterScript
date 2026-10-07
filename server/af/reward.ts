@@ -3,7 +3,7 @@ import { withRecoveredCollector, withTransportLock } from './browser.js'
 import { warmAkamaiSession } from './session-warm.js'
 import {
   CACHE_TTL_MS,
-  CLIENT_REVISION,
+  clientRevision,
   RATLINE_AVAILABLE_OFFERS_HASH,
   RATLINE_LOWEST_FARE_HASH,
 } from './hashes.js'
@@ -88,7 +88,7 @@ const executeRewardSearch = async (request: SearchRequest): Promise<SearchCaptur
     ))
     const batch = await postGraphQlBatch<AvailableOffersPayload>(page, offerBodies, {
       useRewardHeaders: true,
-      revision: CLIENT_REVISION,
+      revision: clientRevision(),
     })
 
     const offers: RawOffer[] = []

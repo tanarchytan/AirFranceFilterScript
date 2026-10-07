@@ -3,7 +3,7 @@ import type { Page } from 'patchright'
 import type { SearchRequest } from '../../src/types.js'
 import { navigateAirFrance, refreshCollectorPage } from './browser.js'
 import {
-  CLIENT_REVISION,
+  clientRevision,
   COLLECTOR_PAGE,
   CONTEXT_PASSENGERS_HASH,
   CREATE_SEARCH_CONTEXT_HASH,
@@ -23,7 +23,7 @@ export const rewardTransportOptions = {
   withHashcash: true,
   queryBookingFlow: 'LEISURE' as const,
   useRewardHeaders: true,
-  revision: CLIENT_REVISION,
+  revision: clientRevision(),
 }
 
 const normalizeTravelers = (raw: unknown): Array<{ travelerKey?: number; travelerSource?: string }> => {
@@ -73,7 +73,7 @@ export const prepareRewardSession = async (
       'SearchCustomerForSearchQuery',
       SEARCH_CUSTOMER_HASH,
       { expand: 'memberships_flyingblue' },
-      { withHashcash: false, useRewardHeaders: true, revision: CLIENT_REVISION },
+      { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
     )
     if (!payload.data || Object.values(payload.data).every((value) => value == null)) {
       throw new FlyingBlueAuthError()
@@ -94,7 +94,7 @@ export const prepareRewardSession = async (
       'SharedSearchCreateSearchContextForSearchQuery',
       CREATE_SEARCH_CONTEXT_HASH,
       { searchStateUuid },
-      { withHashcash: false, useRewardHeaders: true, revision: CLIENT_REVISION },
+      { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
     )
   } catch {
     await refreshCollectorPage(page)

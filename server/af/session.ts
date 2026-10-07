@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { getBrowserContext } from './browser.js'
+import { SITE_DOMAIN } from './market.js'
 
 interface ExportedCookie {
   name?: unknown
@@ -36,7 +37,7 @@ const cookieFromExport = (cookie: ExportedCookie): BrowserCookie | undefined => 
   if (typeof cookie.name !== 'string' || typeof cookie.value !== 'string' || typeof cookie.domain !== 'string') {
     return undefined
   }
-  if (!cookie.domain.toLowerCase().endsWith('airfrance.fr')) return undefined
+  if (!cookie.domain.toLowerCase().endsWith(SITE_DOMAIN)) return undefined
   const expirationDate = typeof cookie.expirationDate === 'number' && cookie.expirationDate > Date.now() / 1000
     ? cookie.expirationDate
     : undefined

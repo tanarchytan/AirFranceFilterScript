@@ -11,6 +11,7 @@ import {
 } from './hashes.js'
 import { graphQlErrorMessage, solveHashcash } from './hashcash.js'
 import { markSessionWarm } from './session-state.js'
+import { MARKET } from './market.js'
 import type { BookingFlow } from './types.js'
 
 export interface GraphQlBody {
@@ -40,18 +41,18 @@ const spoofedAbsolute = (queryBookingFlow: BookingFlow): string => (
 const cashHeaders = {
   accept: 'application/json, text/plain, */*',
   'content-type': 'application/json',
-  'afkl-travel-country': 'FR',
+  'afkl-travel-country': MARKET.country,
   'afkl-travel-host': 'AF',
-  'afkl-travel-language': 'fr',
-  'afkl-travel-market': 'FR',
-  country: 'FR',
-  language: 'fr',
+  'afkl-travel-language': MARKET.language,
+  'afkl-travel-market': MARKET.country,
+  country: MARKET.country,
+  language: MARKET.language,
 } as const
 
 const rewardHeaders = (revision: string) => ({
   ...cashHeaders,
-  'accept-language': 'fr',
-  'x-aviato-host': 'wwws.airfrance.fr',
+  'accept-language': MARKET.acceptLanguage,
+  'x-aviato-host': MARKET.host,
   'x-client-revision': revision,
   'x-ubc-name': 'search',
 })
