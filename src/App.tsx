@@ -10,7 +10,7 @@ import { AuthPrompt } from './AuthPrompt'
 import { ScanControls, ScanResults, type ScanSettings } from './ScanPanel'
 import { formatDuration, rankOffers } from './lib/optimizer'
 import { matchStationQuery, stationLabel } from './lib/stations'
-import type { Cabin, ExploreFare, ExploreResponse, RankedOffer, SearchRequest, SearchResponse, Station, TripScanResponse } from './types'
+import type { Cabin, ExploreFare, ExploreResponse, RankedOffer, ScanProgress, SearchRequest, SearchResponse, Station, TripScanResponse } from './types'
 
 const cabinLabels: Record<Cabin, string> = {
   ECONOMY: 'Economy',
@@ -518,11 +518,22 @@ function ExploreCalendar({
   </section>
 }
 
-function LiveSearchState({ elapsed, onCancel }: { elapsed: number; onCancel: () => void }) {
+function LiveSearchState({ elapsed, onCancel, progress }: { elapsed: number; onCancel: () => void; progress?: ScanProgress }) {
+  const total = progress?.running ? progress.total : 0
+  const done = Math.min(progress?.done ?? 0, total)
+  const percent = total ? Math.round((done / total) * 100) : 0
+  // Time per call so far × calls left; only meaningful once one call has finished.
+  const secondsLeft = done > 0 && done < total ? Math.round((elapsed / done) * (total - done)) : undefined
   return (
     <div className="live-search-state" role="status">
       <div className="radar-scope"><Radar size={28} /><span /></div>
-      <div><strong>Air France is computing availability</strong><span>Live session · {elapsed.toFixed(1)} s</span></div>
+      <div>
+        <strong>{total ? progress?.label || 'Scanning Air France calendars' : 'Air France is computing availability'}</strong>
+        <span>{total
+          ? `${done} of ${total} calls · ${percent}% · ${elapsed.toFixed(0)} s${secondsLeft != null ? ` · about ${secondsLeft} s left` : ''}`
+          : `Live session · ${elapsed.toFixed(1)} s`}</span>
+        {total > 0 && <div className="live-progress" aria-label={`${percent}% done`}><i style={{ width: `${percent}%` }} /></div>}
+      </div>
       <button type="button" onClick={onCancel}><X size={15} /> Cancel</button>
     </div>
   )
@@ -539,6 +550,7 @@ function App() {
   const [searchMode, setSearchMode] = useState<SearchMode>('search')
   const [scanSettings, setScanSettings] = useState<ScanSettings>({ period: 'quarter', stayNights: null })
   const [scanResponse, setScanResponse] = useState<TripScanResponse>()
+  const [scanProgress, setScanProgress] = useState<ScanProgress>()
   const [explorePaymentMode, setExplorePaymentMode] = useState<'cash' | 'both'>('cash')
   const [flyingBlueReady, setFlyingBlueReady] = useState(false)
   const [awaitingSignIn, setAwaitingSignIn] = useState(false)
@@ -565,6 +577,17 @@ function App() {
     setError(undefined)
     setSearchMode(mode)
   }
+
+  useEffect(() => {
+    if (!loading || searchMode !== 'scan') return
+    const timer = window.setInterval(() => {
+      void fetch('/api/scan/progress')
+        .then((result) => result.json() as Promise<ScanProgress>)
+        .then(setScanProgress)
+        .catch(() => undefined)
+    }, 1_000)
+    return () => window.clearInterval(timer)
+  }, [loading, searchMode])
 
   useEffect(() => {
     if (!loading) return
@@ -974,7 +997,7 @@ function App() {
             </div>
           </div>
 
-          {loading && <LiveSearchState elapsed={elapsed} onCancel={cancelSearch} />}
+          {loading && <LiveSearchState elapsed={elapsed} onCancel={cancelSearch} progress={searchMode === 'scan' ? scanProgress : undefined} />}
           <AuthPrompt visible={!loading && needsFlyingBlueAuth} onConfirmed={onFlyingBlueConfirmed} />
           {(error || nonAuthWarnings?.length) ? <div className={`status-banner ${error || (searchMode === 'explore' ? exploreResponse?.status : response?.status) === 'blocked' ? 'is-error' : ''}`}><CircleAlert size={17} /><span>{error ?? nonAuthWarnings?.[0]}</span>{error && <button type="button" title="Close" onClick={() => setError(undefined)}><X size={15} /></button>}</div> : null}
 

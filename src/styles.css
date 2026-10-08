@@ -539,3 +539,6 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 .scan-group-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 12px; }
 .scan-group-head span { color: var(--muted); font: 500 11px 'IBM Plex Mono'; }
 @media (max-width: 720px) { .scan-row { grid-template-columns: 1fr 1fr; } .scan-table { font-size: 11px; } .scan-table th, .scan-table td { padding: 8px; } }
+
+.live-progress { margin-top: 6px; width: min(360px, 52vw); height: 4px; border-radius: 2px; background: rgba(255,255,255,.15); overflow: hidden; }
+.live-progress i { display: block; height: 100%; background: var(--red); transition: width .4s ease; }

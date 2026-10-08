@@ -17,7 +17,7 @@ import {
 import { getAirFranceStations } from './airfrance.js'
 import { describeAirFranceTransportError } from './af/transport-errors.js'
 import { isAllowedOrigin, isLocalHost } from './local-guard.js'
-import { scanRewardTrips } from './af/trip-scan-run.js'
+import { getScanProgress, scanRewardTrips } from './af/trip-scan-run.js'
 
 const app = Fastify({ logger: true })
 await app.register(cors, { origin: (origin, done) => done(null, isAllowedOrigin(origin)) })
@@ -210,6 +210,8 @@ app.get('/api/stations', async (request, reply) => {
     .slice(0, 12)
   return { source: 'live', results }
 })
+
+app.get('/api/scan/progress', async () => getScanProgress())
 
 app.post('/api/scan', async (request, reply) => {
   const parsed = scanSchema.safeParse(request.body)

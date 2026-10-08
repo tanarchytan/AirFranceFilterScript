@@ -1,5 +1,5 @@
 import type { Page } from 'patchright'
-import type { DayFare, SearchRequest, TripScanRequest, TripScanResponse } from '../../src/types.js'
+import type { DayFare, ScanProgress, SearchRequest, TripScanRequest, TripScanResponse } from '../../src/types.js'
 import { withRecoveredCollector, withTransportLock } from './browser.js'
 import { RATLINE_LOWEST_FARE_HASH } from './hashes.js'
 import { prepareRewardSession, rewardTransportOptions } from './reward-session.js'
@@ -24,6 +24,12 @@ const MIN_GAP_MS = 1_500
 const JITTER_MS = 1_000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** One scan at a time (the transport lock serialises them), so one shared progress record. */
+let progress: ScanProgress = { running: false, done: 0, total: 0, label: '' }
+export const getScanProgress = (): ScanProgress => progress
+
+const monthLabel = new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' })
 const today = () => new Date().toISOString().slice(0, 10)
 
 /** One-way search request for one direction; the calendar only reads route, cabin and adults. */
@@ -52,13 +58,13 @@ const scanLeg = async (
   request: SearchRequest,
   from: string,
   to: string,
-  onRequest: () => void,
+  direction: 'Outbound' | 'Return',
 ): Promise<DayFare[]> => {
   const { searchStateUuid, companions } = await prepareRewardSession(page, request)
   const days: DayFare[] = []
   for (const [first, last] of monthChunks(from, to)) {
     await sleep(MIN_GAP_MS + Math.random() * JITTER_MS)
-    onRequest()
+    progress = { ...progress, label: `${direction} ${monthLabel.format(new Date(`${first}T00:00:00Z`))}` }
     const payload = await postGraphQlWithRetry<LowestFarePayload>(
       page,
       'SharedSearchLowestFareOffersForSearchQuery',
@@ -68,6 +74,7 @@ const scanLeg = async (
     )
     days.push(...dayFaresFrom(payload.data?.lowestFareOffers?.lowestOffers ?? [])
       .filter((day) => day.date >= first && day.date <= last))
+    progress = { ...progress, done: progress.done + 1 }
   }
   return days
 }
@@ -75,16 +82,17 @@ const scanLeg = async (
 export const scanRewardTrips = async (scan: TripScanRequest): Promise<TripScanResponse> => {
   const startedAt = Date.now()
   const [from, to] = periodRange(scan.period, today())
-  let requests = 0
-  const count = () => { requests += 1 }
+  const windowEnd = addDays(today(), BOOKING_WINDOW_DAYS)
+  const lastReturn = addDays(to, scan.stayNights ?? MAX_ANY_STAY_NIGHTS)
+  const returnRange: [string, string] = [addDays(from, 1), lastReturn < windowEnd ? lastReturn : windowEnd]
+  const total = monthChunks(from, to).length + (scan.tripType === 'return' ? monthChunks(...returnRange).length : 0)
+  progress = { running: true, done: 0, total, label: 'Checking the Flying Blue login', startedAt: new Date().toISOString() }
   return withTransportLock(() => withRecoveredCollector(async (page) => {
     await warmAkamaiSession(page)
-    const outbound = await scanLeg(page, legRequest(scan, false), from, to, count)
+    const outbound = await scanLeg(page, legRequest(scan, false), from, to, 'Outbound')
     let inbound: DayFare[] | undefined
     if (scan.tripType === 'return') {
-      const windowEnd = addDays(today(), BOOKING_WINDOW_DAYS)
-      const lastReturn = addDays(to, scan.stayNights ?? MAX_ANY_STAY_NIGHTS)
-      inbound = await scanLeg(page, legRequest(scan, true), addDays(from, 1), lastReturn < windowEnd ? lastReturn : windowEnd, count)
+      inbound = await scanLeg(page, legRequest(scan, true), ...returnRange, 'Return')
     }
     const trips = combineTrips(outbound, inbound, { stayNights: scan.stayNights, mileValueCents: scan.mileValueCents })
     return {
@@ -95,8 +103,8 @@ export const scanRewardTrips = async (scan: TripScanRequest): Promise<TripScanRe
       byMiles: rankTrips(trips, 'miles', RANK_LIMIT),
       byValue: rankTrips(trips, 'value', RANK_LIMIT),
       byOutbound: cheapestOutboundsWithReturns(outbound, trips, { outboundLimit: 10, returnLimit: 5 }),
-      requests,
+      requests: progress.done,
       durationMs: Date.now() - startedAt,
     }
-  }))
+  })).finally(() => { progress = { ...progress, running: false, label: '' } })
 }

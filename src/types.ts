@@ -193,6 +193,16 @@ export interface TripScanRequest {
   mileValueCents: number
 }
 
+export interface ScanProgress {
+  running: boolean
+  /** Air France calendar calls finished / planned. */
+  done: number
+  total: number
+  /** What is being fetched now, e.g. "Outbound Nov 2026". */
+  label: string
+  startedAt?: string
+}
+
 export interface TripScanResponse {
   from: string
   to: string
