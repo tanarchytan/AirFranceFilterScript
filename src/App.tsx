@@ -2,14 +2,15 @@ import {
   Activity, ArrowDownUp, ArrowRight, BarChart3, CalendarDays, CalendarRange, Check,
   CheckCircle2, ChevronDown, CircleAlert, Clock3, Coins, Copy, Database,
   ExternalLink, Gauge, Info, Luggage, MapPin, Plane, Radar, RefreshCw,
-  Route, Search, ShieldCheck, SlidersHorizontal, Sparkles, TicketCheck,
+  Route, ScanSearch, Search, ShieldCheck, SlidersHorizontal, Sparkles, TicketCheck,
   TimerReset, Users, X, Zap,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthPrompt } from './AuthPrompt'
+import { initialScanSettings, ScanControls, ScanResults, type ScanSettings } from './ScanPanel'
 import { formatDuration, rankOffers } from './lib/optimizer'
 import { matchStationQuery, stationLabel } from './lib/stations'
-import type { Cabin, ExploreFare, ExploreResponse, RankedOffer, SearchRequest, SearchResponse, Station } from './types'
+import type { Cabin, ExploreFare, ExploreResponse, RankedOffer, SearchRequest, SearchResponse, Station, TripScanResponse } from './types'
 
 const cabinLabels: Record<Cabin, string> = {
   ECONOMY: 'Economy',
@@ -529,13 +530,15 @@ function LiveSearchState({ elapsed, onCancel }: { elapsed: number; onCancel: () 
 
 type ResultView = 'deals' | 'all' | 'analysis' | 'months' | 'calendar'
 type SortMode = 'deal' | 'cash' | 'miles' | 'duration'
-type SearchMode = 'search' | 'explore'
+type SearchMode = 'search' | 'explore' | 'scan'
 
 function App() {
   const [request, setRequest] = useState<SearchRequest>(initialRequest)
   const [response, setResponse] = useState<SearchResponse>()
   const [exploreResponse, setExploreResponse] = useState<ExploreResponse>()
   const [searchMode, setSearchMode] = useState<SearchMode>('search')
+  const [scanSettings, setScanSettings] = useState<ScanSettings>(initialScanSettings)
+  const [scanResponse, setScanResponse] = useState<TripScanResponse>()
   const [explorePaymentMode, setExplorePaymentMode] = useState<'cash' | 'both'>('cash')
   const [flyingBlueReady, setFlyingBlueReady] = useState(false)
   const [awaitingSignIn, setAwaitingSignIn] = useState(false)
@@ -729,6 +732,49 @@ function App() {
     }
   }, [ensureFlyingBlueSession, explorePaymentMode, request.destination, request.origin])
 
+  const runScan = useCallback(async () => {
+    searchController.current?.abort()
+    const controller = new AbortController()
+    searchController.current = controller
+    setSearchMode('scan')
+    if (!await ensureFlyingBlueSession()) return
+    setLoading(true)
+    setElapsed(0)
+    setError(undefined)
+    setScanResponse(undefined)
+    try {
+      const result = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          origin: request.origin,
+          destination: request.destination,
+          tripType: request.tripType,
+          adults: request.adults,
+          cabins: request.cabins.slice(0, 1),
+          period: scanSettings.period,
+          stayNights: request.tripType === 'return' ? scanSettings.stayNights : null,
+          mileValueCents: request.mileValueCents,
+        }),
+        signal: controller.signal,
+      })
+      const payload = await result.json() as TripScanResponse
+      if (result.status === 401 && payload.authRequired) {
+        setFlyingBlueReady(false)
+        setAwaitingSignIn(true)
+        void fetch('/api/auth/open', { method: 'POST' })
+        return
+      }
+      if (!result.ok) throw new Error(payload.error ?? 'Scan failed')
+      setScanResponse(payload)
+    } catch (scanError) {
+      if (scanError instanceof DOMException && scanError.name === 'AbortError') return
+      setError(scanError instanceof Error ? scanError.message : 'The engine is not responding')
+    } finally {
+      if (searchController.current === controller) setLoading(false)
+    }
+  }, [ensureFlyingBlueSession, request, scanSettings])
+
   const selectExploreFare = useCallback((departureDate: string, paymentMode: 'cash' | 'miles') => {
     const nextRequest: SearchRequest = {
       ...request,
@@ -789,6 +835,7 @@ function App() {
     setFlyingBlueReady(true)
     setAwaitingSignIn(false)
     if (searchMode === 'explore') void runExplore()
+    else if (searchMode === 'scan') void runScan()
     else void runSearch()
   }
   const nonAuthWarnings = activeWarnings?.filter((warning) => !/Flying Blue|login|log in/i.test(warning))
@@ -819,7 +866,8 @@ function App() {
 
             <div className="search-mode-switch" aria-label="Search mode">
               <button type="button" className={searchMode === 'search' ? 'active' : ''} onClick={() => changeSearchMode('search')}><Search size={15} /> Search</button>
-              <button type="button" className={searchMode === 'explore' ? 'active' : ''} onClick={() => changeSearchMode('explore')}><CalendarRange size={15} /> Explore 12 months</button>
+              <button type="button" className={searchMode === 'explore' ? 'active' : ''} onClick={() => changeSearchMode('explore')}><CalendarRange size={15} /> Explore</button>
+              <button type="button" className={searchMode === 'scan' ? 'active' : ''} onClick={() => changeSearchMode('scan')}><ScanSearch size={15} /> Scan trips</button>
             </div>
 
             <div className="journey-fields">
@@ -827,6 +875,8 @@ function App() {
               <button className="swap-button" type="button" onClick={swapStations} title="Swap airports"><ArrowDownUp size={16} /></button>
               <StationAutocomplete key={`destination-${request.destination.code || 'empty'}`} label="Destination" value={request.destination} destination onPendingChange={setDestinationPending} onChange={(station) => patchRequest('destination', station)} />
             </div>
+
+            {searchMode === 'scan' && <ScanControls settings={scanSettings} onSettings={setScanSettings} request={request} patchRequest={patchRequest} />}
 
             {searchMode === 'explore' && <label className="explore-payment-select">
               <span>Fares to compare</span>
@@ -889,16 +939,18 @@ function App() {
               <label className="check-line"><input type="checkbox" checked={request.separateTickets} onChange={(event) => patchRequest('separateTickets', event.target.checked)} /><span><Check size={12} /></span>Separate tickets</label>
             </div>}</>}
 
-            <button className={`search-button ${searchMode === 'explore' ? 'explore' : ''}`} type="button" onClick={() => { void (searchMode === 'explore' ? runExplore() : runSearch()) }} disabled={loading || !routeReady || milesGateActive}>
+            <button className={`search-button ${searchMode === 'explore' ? 'explore' : ''}`} type="button" onClick={() => { void (searchMode === 'explore' ? runExplore() : searchMode === 'scan' ? runScan() : runSearch()) }} disabled={loading || !routeReady || milesGateActive}>
               {loading
-                ? <><RefreshCw className="spin" size={17} /> {searchMode === 'explore' ? 'Reading calendars…' : 'Querying Air France…'}</>
+                ? <><RefreshCw className="spin" size={17} /> {searchMode === 'search' ? 'Querying Air France…' : 'Reading calendars…'}</>
                 : milesGateActive
                   ? <><Coins size={17} /> Waiting for Miles login…</>
+                  : searchMode === 'scan'
+                    ? <><ScanSearch size={17} /> Scan for the best trips</>
                   : searchMode === 'explore'
                     ? <><CalendarRange size={17} /> Find monthly Top 3</>
                     : <><Search size={17} /> Run live analysis</>}
             </button>
-            <p className={`search-footnote ${!routeReady || milesGateActive ? 'is-warning' : ''}`}><Database size={13} /> {!routeReady ? 'Pick an Air France origin and destination' : milesGateActive ? 'Log in in Chrome, then click "I\'m logged in"' : searchMode === 'explore' ? 'Air France MONTH + DAY calendars' : 'Live Air France fares'}</p>
+            <p className={`search-footnote ${!routeReady || milesGateActive ? 'is-warning' : ''}`}><Database size={13} /> {!routeReady ? 'Pick an Air France origin and destination' : milesGateActive ? 'Log in in Chrome, then click "I\'m logged in"' : searchMode === 'scan' ? 'Air France DAY calendars, both directions' : searchMode === 'explore' ? 'Air France MONTH + DAY calendars' : 'Live Air France fares'}</p>
           </div>
         </aside>
 
@@ -906,21 +958,27 @@ function App() {
           <div className="results-header">
             <div>
               <span className="eyebrow">{request.origin.cityName || 'Origin'} to {request.destination.cityName || 'destination'}</span>
-              <h2>{searchMode === 'explore'
+              <h2>{searchMode === 'scan'
+                ? scanResponse ? `${scanResponse.byMiles.length} best trips` : 'Miles trip scanner'
+                : searchMode === 'explore'
                 ? exploreResponse ? `${exploreResponse.months.length} months compared` : 'Yearly euros + Miles radar'
                 : response ? `${ranked.length} Air France itineraries` : 'Live comparison cockpit'}</h2>
-              <p>{searchMode === 'explore'
+              <p>{searchMode === 'scan'
+                ? `Flying Blue · ${request.tripType === 'oneway' ? 'one-way' : 'return'} · ${request.adults} adult${request.adults > 1 ? 's' : ''} · ${cabinLabels[request.cabins[0]]}`
+                : searchMode === 'explore'
                 ? `Top 3 return prices per month · ${explorePaymentMode === 'both' ? 'Euros + Miles' : 'Euros'} · Economy · 1 adult`
                 : <>{readableDate(request.departureDate)}{request.tripType === 'oneway' ? ' · one-way' : ` · ${readableDate(request.returnDate)}`}{request.flexibleDays ? ` · ±${request.flexibleDays} d${request.tripType === 'oneway' ? '' : ` · stay ${request.tripLengthDays} d`}` : ''} · {request.adults} traveller{request.adults > 1 ? 's' : ''} · {request.cabins.map((cabin) => cabinLabels[cabin]).join(', ')}</>}</p>
             </div>
             <div className="header-actions">
-              <button type="button" className="icon-button" title="Refresh" onClick={searchMode === 'explore' ? runExplore : runSearch} disabled={loading || !routeReady}><RefreshCw size={17} /></button>
+              <button type="button" className="icon-button" title="Refresh" onClick={searchMode === 'explore' ? runExplore : searchMode === 'scan' ? runScan : runSearch} disabled={loading || !routeReady}><RefreshCw size={17} /></button>
             </div>
           </div>
 
           {loading && <LiveSearchState elapsed={elapsed} onCancel={cancelSearch} />}
           <AuthPrompt visible={!loading && needsFlyingBlueAuth} onConfirmed={onFlyingBlueConfirmed} />
           {(error || nonAuthWarnings?.length) ? <div className={`status-banner ${error || (searchMode === 'explore' ? exploreResponse?.status : response?.status) === 'blocked' ? 'is-error' : ''}`}><CircleAlert size={17} /><span>{error ?? nonAuthWarnings?.[0]}</span>{error && <button type="button" title="Close" onClick={() => setError(undefined)}><X size={15} /></button>}</div> : null}
+
+          {searchMode === 'scan' && scanResponse && <ScanResults response={scanResponse} request={request} />}
 
           {searchMode === 'explore' && exploreResponse && exploreResponse.months.length > 0 && <ExploreCalendar response={exploreResponse} paymentMode={explorePaymentMode} onSelect={selectExploreFare} />}
 
