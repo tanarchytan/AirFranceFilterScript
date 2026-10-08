@@ -10,6 +10,7 @@ import {
   SEARCH_CUSTOMER_HASH,
 } from './hashes.js'
 import { FlyingBlueAuthError } from './hashcash.js'
+import { saveSessionCookies } from './session-store.js'
 import { postGraphQlWithRetry } from './transport.js'
 import type {
   CreateSearchContextPayload,
@@ -78,6 +79,8 @@ export const prepareRewardSession = async (
     if (!payload.data || Object.values(payload.data).every((value) => value == null)) {
       throw new FlyingBlueAuthError()
     }
+    // Best effort: refresh the saved login so it survives the next API restart.
+    await saveSessionCookies(page.context()).catch(() => undefined)
   } catch (error) {
     if (error instanceof FlyingBlueAuthError) throw error
     const message = error instanceof Error ? error.message : String(error)

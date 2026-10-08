@@ -7,6 +7,7 @@ import {
 } from './browser-launch.js'
 import { BROWSER_TIMEOUT_MS, COLLECTOR_PAGE, setClientRevision } from './hashes.js'
 import { ORIGIN, SITE_DOMAIN, parseClientRevision } from './market.js'
+import { restoreSessionCookies } from './session-store.js'
 import { describeAirFranceTransportError, isAirFranceNetworkError } from './transport-errors.js'
 
 const CDP_ENDPOINT = process.env.AF_CDP_ENDPOINT
@@ -31,9 +32,11 @@ const startBrowserContext = async (): Promise<BrowserContext> => {
   try {
     const context = await startPersistentContext()
     context.on('close', () => { contextPromise = undefined })
+    await restoreSessionCookies(context, true).catch(() => 0)
     return context
   } catch {
     const { context, browser } = await startEphemeralContext()
+    await restoreSessionCookies(context, false).catch(() => 0)
     ownedBrowser = browser
     browserPromise = Promise.resolve(browser)
     browser.on('disconnected', () => {

@@ -7,6 +7,7 @@ import {
 } from './hashes.js'
 import { FlyingBlueAuthError } from './hashcash.js'
 import { ORIGIN } from './market.js'
+import { saveSessionCookies } from './session-store.js'
 import { postGraphQl } from './transport.js'
 import type { SearchCustomerPayload } from './types.js'
 
@@ -21,7 +22,10 @@ const probeCustomer = async (page: Page): Promise<boolean> => {
     { expand: 'memberships_flyingblue' },
     { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
   )
-  return Boolean(payload.data && !Object.values(payload.data).every((value) => value == null))
+  const authenticated = Boolean(payload.data && !Object.values(payload.data).every((value) => value == null))
+  // Best effort: a failed write only means logging in again after the next restart.
+  if (authenticated) await saveSessionCookies(page.context()).catch(() => undefined)
+  return authenticated
 }
 
 const restoreCollectorPage = async (page: Page): Promise<void> => {
