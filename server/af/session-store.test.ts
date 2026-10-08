@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cookiesToRestore, cookiesToSave } from './session-store.js'
+import { cookiesToRestore, cookiesToSave, sessionSignature } from './session-store.js'
 
 const cookie = (name: string, domain: string, expires: number) => ({
   name, value: 'v', domain, path: '/', expires, httpOnly: true, secure: true, sameSite: 'Lax' as const,
@@ -21,6 +21,16 @@ describe('session-store', () => {
       cookie('_abck', '.airfrance.nl', 2_000_000_000),
     ], { persistentProfile: true, nowSeconds: 1_800_000_000 })
     expect(restored.map((item) => item.name)).toEqual(['aviato_sso_sessionid'])
+  })
+
+  it('signs only Air France session cookies, so a fresh login changes it and tracking cookies do not', () => {
+    const before = [cookie('_ga', '.airfrance.nl', 2_000_000_000)]
+    const loggedIn = [...before, cookie('aviato_sso_sessionid', 'wwws.airfrance.nl', -1)]
+    const refreshed = [cookie('_ga', '.airfrance.nl', 2_100_000_000), cookie('aviato_sso_sessionid', 'wwws.airfrance.nl', -1)]
+    expect(sessionSignature(before)).toBe('')
+    expect(sessionSignature(loggedIn)).not.toBe('')
+    expect(sessionSignature(refreshed)).toBe(sessionSignature(loggedIn))
+    expect(sessionSignature([{ ...loggedIn[1], value: 'new' }])).not.toBe(sessionSignature(loggedIn))
   })
 
   it('restores session and unexpired cookies into an empty browser, never expired ones', () => {

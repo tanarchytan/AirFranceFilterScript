@@ -28,6 +28,33 @@ export const cookiesToRestore = (
   cookie.expires === -1 || (!persistentProfile && cookie.expires > nowSeconds)
 ))
 
+/** Identity of the session-only cookies; '' when there are none (not logged in yet). */
+export const sessionSignature = (cookies: Cookie[]): string => cookiesToSave(cookies)
+  .filter((cookie) => cookie.expires === -1)
+  .map((cookie) => `${cookie.domain}|${cookie.name}|${cookie.value}`)
+  .sort()
+  .join('\n')
+
+const WATCH_INTERVAL_MS = 3_000
+
+/**
+ * Save the moment a login lands, so the user can close Chrome right after logging in.
+ * Session cookies cannot be read once the browser is gone, hence polling while it is open.
+ */
+export const watchSessionCookies = (context: BrowserContext): void => {
+  let lastSignature = ''
+  const timer = setInterval(() => {
+    void context.cookies().then(async (cookies) => {
+      const signature = sessionSignature(cookies)
+      if (!signature || signature === lastSignature) return
+      await saveSessionCookies(context)
+      lastSignature = signature
+    }).catch(() => undefined) // context closing mid-poll; the close handler stops the timer
+  }, WATCH_INTERVAL_MS)
+  timer.unref()
+  context.on('close', () => clearInterval(timer))
+}
+
 export const saveSessionCookies = async (context: BrowserContext): Promise<void> => {
   const cookies = cookiesToSave(await context.cookies())
   if (!cookies.length) return
