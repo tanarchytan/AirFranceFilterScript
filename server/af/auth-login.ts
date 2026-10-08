@@ -67,6 +67,8 @@ export const confirmFlyingBlueSession = async (): Promise<{
   authenticated: boolean
   cookieCount: number
   url: string
+  /** Why Air France said no, when it did (shown to the user instead of a bare "not found"). */
+  detail?: string
 }> => withTransportLock(async () => (
   withRecoveredCollector(async (page) => {
     await page.bringToFront().catch(() => undefined)
@@ -75,14 +77,11 @@ export const confirmFlyingBlueSession = async (): Promise<{
     const cookieCount = cookies.filter((cookie) => /airfrance/i.test(cookie.domain)).length
     try {
       const authenticated = await probeCustomer(page)
-      return { authenticated, cookieCount, url: page.url() }
+      return { authenticated, cookieCount, url: page.url(), ...(authenticated ? {} : { detail: 'SearchCustomer returned no customer' }) }
     } catch (error) {
-      if (error instanceof FlyingBlueAuthError) {
-        return { authenticated: false, cookieCount, url: page.url() }
-      }
       const message = error instanceof Error ? error.message : String(error)
-      if (/401|not authenticated|Flying Blue|CustomerAPI/i.test(message)) {
-        return { authenticated: false, cookieCount, url: page.url() }
+      if (error instanceof FlyingBlueAuthError || /401|not authenticated|Flying Blue|CustomerAPI/i.test(message)) {
+        return { authenticated: false, cookieCount, url: page.url(), detail: message.slice(0, 300) }
       }
       throw error
     }

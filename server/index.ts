@@ -153,6 +153,7 @@ app.post('/api/auth/confirm', async (request, reply) => {
         authenticated: false,
         cookieCount: session.cookieCount,
         error: 'Flying Blue session not found. Finish logging in in Chrome, then try again.',
+        detail: session.detail,
       })
     }
     return {
