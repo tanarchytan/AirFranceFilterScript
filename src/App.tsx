@@ -1036,7 +1036,10 @@ function App() {
           </div>}
 
           <footer className="results-footer">
-            {searchMode === 'explore' ? <>
+            {searchMode === 'scan' ? <>
+              <span><Info size={14} /> {scanResponse ? `Scanned ${scanResponse.from} to ${scanResponse.to}` : 'No scan yet'}</span>
+              <span>{scanResponse ? `${(scanResponse.durationMs / 1000).toFixed(1)} s · ${scanResponse.requests} Air France calls` : 'source: none'}</span>
+            </> : searchMode === 'explore' ? <>
               <span><Info size={14} /> {exploreResponse ? `Last explore ${dateTimeLabel(exploreResponse.searchedAt)}` : 'Waiting for Air France calendars'}</span>
               <span>{exploreResponse ? `${(exploreResponse.durationMs / 1000).toFixed(1)} s · ${exploreResponse.months.length} months · ${exploreResponse.trace.cacheHit ? 'live cache 90 s' : 'fresh session'}` : 'source: none'}</span>
             </> : <>
