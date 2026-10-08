@@ -982,7 +982,7 @@ function App() {
             <div>
               <span className="eyebrow">{request.origin.cityName || 'Origin'} to {request.destination.cityName || 'destination'}</span>
               <h2>{searchMode === 'scan'
-                ? scanResponse ? `${scanResponse.byMiles.length} best trips` : 'Miles trip scanner'
+                ? scanResponse ? `${scanResponse.byPrice.length} best trips` : 'Miles trip scanner'
                 : searchMode === 'explore'
                 ? exploreResponse ? `${exploreResponse.months.length} months compared` : 'Yearly euros + Miles radar'
                 : response ? `${ranked.length} Air France itineraries` : 'Live comparison cockpit'}</h2>

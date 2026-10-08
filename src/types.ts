@@ -165,7 +165,9 @@ export type ScanPeriod = 'month' | 'quarter' | 'year' | '12m'
 
 export interface DayFare {
   date: string
-  miles: number
+  /** Miles (Flying Blue) or euros (cash) for all passengers. */
+  price: number
+  /** Euro taxes on an award; cash prices already include them. */
   taxes?: number
 }
 
@@ -173,9 +175,9 @@ export interface TripOption {
   outboundDate: string
   returnDate?: string
   nights?: number
-  outboundMiles: number
-  returnMiles?: number
-  totalMiles: number
+  outboundPrice: number
+  returnPrice?: number
+  totalPrice: number
   totalTaxes: number
   /** Miles at the chosen mile value plus taxes, in euros. */
   valueEur: number
@@ -185,6 +187,8 @@ export interface TripScanRequest {
   origin: Station
   destination: Station
   tripType: TripType
+  /** Flying Blue miles or euro fares. */
+  paymentMode: 'miles' | 'cash'
   adults: number
   cabins: Cabin[]
   period: ScanPeriod
@@ -204,11 +208,12 @@ export interface ScanProgress {
 }
 
 export interface TripScanResponse {
+  currency: 'MILES' | 'EUR'
   from: string
   to: string
   outbound: DayFare[]
   inbound?: DayFare[]
-  byMiles: TripOption[]
+  byPrice: TripOption[]
   byValue: TripOption[]
   /** Cheapest outbound days, each with its cheapest returns. */
   byOutbound: Array<{ outbound: DayFare; returns: TripOption[] }>

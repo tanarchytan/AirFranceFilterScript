@@ -55,6 +55,7 @@ const scanSchema = z.object({
   origin: stationSchema,
   destination: stationSchema,
   tripType: z.enum(['return', 'oneway']).default('return'),
+  paymentMode: z.enum(['miles', 'cash']).default('miles'),
   adults: z.number().int().min(1).max(9),
   cabins: z.array(z.enum(['ECONOMY', 'PREMIUM', 'BUSINESS'])).min(1),
   period: z.enum(['month', 'quarter', 'year', '12m']),

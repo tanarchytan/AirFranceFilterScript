@@ -3,7 +3,7 @@ import type { LowestFareOffer } from './types.js'
 import { addDays } from './variables.js'
 
 /** Pure planning and ranking for the trip scanner (network code lives in trip-scan-run.ts). */
-export type TripRanking = 'miles' | 'value'
+export type TripRanking = 'price' | 'value'
 
 /** Air France opens award seats about 355 days ahead. */
 export const BOOKING_WINDOW_DAYS = 355
@@ -39,12 +39,12 @@ export const monthChunks = (from: string, to: string): Array<[string, string]> =
   return chunks
 }
 
-/** One-way calendar rows → priced days (totalPrice is the one-way price for all passengers). */
+/** One-way calendar rows → priced days (totalPrice is the one-way price for all passengers, miles or euros). */
 export const dayFaresFrom = (offers: LowestFareOffer[]): DayFare[] => offers.flatMap((offer) => (
   offer.flightDate && !offer.noFlight && offer.totalPrice != null
     ? [{
       date: offer.flightDate,
-      miles: offer.totalPrice,
+      price: offer.totalPrice,
       ...(offer.totalTaxDetails?.totalPrice != null ? { taxes: offer.totalTaxDetails.totalPrice } : {}),
     }]
     : []
@@ -63,16 +63,17 @@ const roundEur = (value: number): number => Math.round(value * 100) / 100
 export const combineTrips = (
   outbound: DayFare[],
   inbound: DayFare[] | undefined,
-  { stayNights, mileValueCents }: { stayNights: number | null; mileValueCents: number },
+  { stayNights, mileValueCents, currency = 'MILES' }: { stayNights: number | null; mileValueCents: number; currency?: 'MILES' | 'EUR' },
 ): TripOption[] => {
-  const value = (miles: number, taxes: number) => roundEur(miles * mileValueCents / 100 + taxes)
+  // Miles are priced at the chosen mile value; euro fares already are euros.
+  const value = (price: number, taxes: number) => roundEur((currency === 'EUR' ? price : price * mileValueCents / 100) + taxes)
   if (!inbound) {
     return outbound.map((out) => ({
       outboundDate: out.date,
-      outboundMiles: out.miles,
-      totalMiles: out.miles,
+      outboundPrice: out.price,
+      totalPrice: out.price,
       totalTaxes: roundEur(out.taxes ?? 0),
-      valueEur: value(out.miles, out.taxes ?? 0),
+      valueEur: value(out.price, out.taxes ?? 0),
     }))
   }
   const returnsByDate = new Map(inbound.map((fare) => [fare.date, fare]))
@@ -84,17 +85,17 @@ export const combineTrips = (
     for (const nights of stays) {
       const back = returnsByDate.get(addDays(out.date, nights))
       if (!back) continue
-      const totalMiles = out.miles + back.miles
+      const totalPrice = out.price + back.price
       const totalTaxes = roundEur((out.taxes ?? 0) + (back.taxes ?? 0))
       trips.push({
         outboundDate: out.date,
         returnDate: back.date,
         nights: nightsBetween(out.date, back.date),
-        outboundMiles: out.miles,
-        returnMiles: back.miles,
-        totalMiles,
+        outboundPrice: out.price,
+        returnPrice: back.price,
+        totalPrice,
         totalTaxes,
-        valueEur: value(totalMiles, totalTaxes),
+        valueEur: value(totalPrice, totalTaxes),
       })
     }
   }
@@ -103,9 +104,9 @@ export const combineTrips = (
 
 export const rankTrips = (trips: TripOption[], by: TripRanking, limit: number): TripOption[] => [...trips]
   .sort((left, right) => (
-    by === 'miles'
-      ? left.totalMiles - right.totalMiles || left.totalTaxes - right.totalTaxes
-      : left.valueEur - right.valueEur || left.totalMiles - right.totalMiles
+    by === 'price'
+      ? left.totalPrice - right.totalPrice || left.totalTaxes - right.totalTaxes
+      : left.valueEur - right.valueEur || left.totalPrice - right.totalPrice
   ) || left.outboundDate.localeCompare(right.outboundDate) || (left.returnDate ?? '').localeCompare(right.returnDate ?? ''))
   .slice(0, limit)
 
@@ -115,9 +116,9 @@ export const cheapestOutboundsWithReturns = (
   trips: TripOption[],
   { outboundLimit, returnLimit }: { outboundLimit: number; returnLimit: number },
 ): Array<{ outbound: DayFare; returns: TripOption[] }> => [...outbound]
-  .sort((left, right) => left.miles - right.miles || (left.taxes ?? 0) - (right.taxes ?? 0) || left.date.localeCompare(right.date))
+  .sort((left, right) => left.price - right.price || (left.taxes ?? 0) - (right.taxes ?? 0) || left.date.localeCompare(right.date))
   .slice(0, outboundLimit)
   .map((day) => ({
     outbound: day,
-    returns: rankTrips(trips.filter((trip) => trip.outboundDate === day.date && trip.returnDate), 'miles', returnLimit),
+    returns: rankTrips(trips.filter((trip) => trip.outboundDate === day.date && trip.returnDate), 'price', returnLimit),
   }))

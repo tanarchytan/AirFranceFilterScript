@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto'
 import type { Page } from 'patchright'
 import type { DayFare, ScanProgress, SearchRequest, TripScanRequest, TripScanResponse } from '../../src/types.js'
 import { withRecoveredCollector, withTransportLock } from './browser.js'
-import { RATLINE_LOWEST_FARE_HASH } from './hashes.js'
+import { LOWEST_FARE_HASH, RATLINE_LOWEST_FARE_HASH } from './hashes.js'
 import { prepareRewardSession, rewardTransportOptions } from './reward-session.js'
 import { warmAkamaiSession } from './session-warm.js'
 import { postGraphQlWithRetry } from './transport.js'
@@ -42,7 +43,7 @@ const legRequest = (scan: TripScanRequest, reverse: boolean): SearchRequest => (
   flexibleDays: 0,
   tripLengthDays: 1,
   cabins: scan.cabins,
-  paymentMode: 'miles',
+  paymentMode: scan.paymentMode,
   adults: scan.adults,
   maxStops: 2,
   maxDurationHours: 72,
@@ -60,18 +61,23 @@ const scanLeg = async (
   to: string,
   direction: 'Outbound' | 'Return',
 ): Promise<DayFare[]> => {
-  const { searchStateUuid, companions } = await prepareRewardSession(page, request)
+  // Cash calendars need no login, traveler keys or proof of work.
+  const cash = request.paymentMode === 'cash'
+  const { searchStateUuid, companions } = cash
+    ? { searchStateUuid: randomUUID(), companions: undefined }
+    : await prepareRewardSession(page, request)
   const days: DayFare[] = []
   for (const [first, last] of monthChunks(from, to)) {
     await sleep(MIN_GAP_MS + Math.random() * JITTER_MS)
     progress = { ...progress, label: `${direction} ${monthLabel.format(new Date(`${first}T00:00:00Z`))}` }
-    const payload = await postGraphQlWithRetry<LowestFarePayload>(
-      page,
-      'SharedSearchLowestFareOffersForSearchQuery',
-      RATLINE_LOWEST_FARE_HASH,
-      lowestFareVariables({ ...request, departureDate: first }, searchStateUuid, 'REWARD', first, last, 'DAY', companions),
-      rewardTransportOptions,
+    const variables = lowestFareVariables(
+      { ...request, departureDate: first }, searchStateUuid, cash ? 'LEISURE' : 'REWARD', first, last, 'DAY', companions,
     )
+    const payload = cash
+      ? await postGraphQlWithRetry<LowestFarePayload>(page, 'SharedSearchLowestFareOffersForSearchQuery', LOWEST_FARE_HASH, variables)
+      : await postGraphQlWithRetry<LowestFarePayload>(
+        page, 'SharedSearchLowestFareOffersForSearchQuery', RATLINE_LOWEST_FARE_HASH, variables, rewardTransportOptions,
+      )
     days.push(...dayFaresFrom(payload.data?.lowestFareOffers?.lowestOffers ?? [])
       .filter((day) => day.date >= first && day.date <= last))
     progress = { ...progress, done: progress.done + 1 }
@@ -86,7 +92,10 @@ export const scanRewardTrips = async (scan: TripScanRequest): Promise<TripScanRe
   const lastReturn = addDays(to, scan.stayNights ?? MAX_ANY_STAY_NIGHTS)
   const returnRange: [string, string] = [addDays(from, 1), lastReturn < windowEnd ? lastReturn : windowEnd]
   const total = monthChunks(from, to).length + (scan.tripType === 'return' ? monthChunks(...returnRange).length : 0)
-  progress = { running: true, done: 0, total, label: 'Checking the Flying Blue login', startedAt: new Date().toISOString() }
+  progress = {
+    running: true, done: 0, total, startedAt: new Date().toISOString(),
+    label: scan.paymentMode === 'cash' ? 'Opening Air France' : 'Checking the Flying Blue login',
+  }
   return withTransportLock(() => withRecoveredCollector(async (page) => {
     await warmAkamaiSession(page)
     const outbound = await scanLeg(page, legRequest(scan, false), from, to, 'Outbound')
@@ -94,13 +103,15 @@ export const scanRewardTrips = async (scan: TripScanRequest): Promise<TripScanRe
     if (scan.tripType === 'return') {
       inbound = await scanLeg(page, legRequest(scan, true), ...returnRange, 'Return')
     }
-    const trips = combineTrips(outbound, inbound, { stayNights: scan.stayNights, mileValueCents: scan.mileValueCents })
+    const currency = scan.paymentMode === 'cash' ? 'EUR' as const : 'MILES' as const
+    const trips = combineTrips(outbound, inbound, { stayNights: scan.stayNights, mileValueCents: scan.mileValueCents, currency })
     return {
+      currency,
       from,
       to,
       outbound,
       ...(inbound ? { inbound } : {}),
-      byMiles: rankTrips(trips, 'miles', RANK_LIMIT),
+      byPrice: rankTrips(trips, 'price', RANK_LIMIT),
       byValue: rankTrips(trips, 'value', RANK_LIMIT),
       byOutbound: cheapestOutboundsWithReturns(outbound, trips, { outboundLimit: 10, returnLimit: 5 }),
       requests: progress.done,

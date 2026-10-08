@@ -78,7 +78,7 @@ const csvFor = (response: TripScanResponse): string => {
   const back = new Map((response.inbound ?? []).map((day) => [day.date, day]))
   const dates = [...new Set([...response.outbound.map((day) => day.date), ...back.keys()])].sort()
   const out = new Map(response.outbound.map((day) => [day.date, day]))
-  const rows = dates.map((date) => [date, out.get(date)?.miles ?? '', out.get(date)?.taxes ?? '', back.get(date)?.miles ?? '', back.get(date)?.taxes ?? ''].join(','))
+  const rows = dates.map((date) => [date, out.get(date)?.price ?? '', out.get(date)?.taxes ?? '', back.get(date)?.price ?? '', back.get(date)?.taxes ?? ''].join(','))
   return ['date,outbound_miles,outbound_taxes_eur,return_miles,return_taxes_eur', ...rows].join('\n')
 }
 
@@ -96,9 +96,9 @@ function TripTable({ trips, oneWay }: { trips: TripOption[]; oneWay: boolean }) 
     <thead><tr><th>Outbound</th>{!oneWay && <><th>Return</th><th>Nights</th></>}<th className="num">Miles</th><th className="num">Taxes</th><th className="num">Value</th></tr></thead>
     <tbody>{trips.map((trip) => (
       <tr key={`${trip.outboundDate}-${trip.returnDate ?? ''}`}>
-        <td>{formatDay(trip.outboundDate)}<small>{miles.format(trip.outboundMiles)}</small></td>
-        {!oneWay && <><td>{formatDay(trip.returnDate)}<small>{trip.returnMiles != null ? miles.format(trip.returnMiles) : ''}</small></td><td>{trip.nights}</td></>}
-        <td className="num strong">{miles.format(trip.totalMiles)}</td>
+        <td>{formatDay(trip.outboundDate)}<small>{miles.format(trip.outboundPrice)}</small></td>
+        {!oneWay && <><td>{formatDay(trip.returnDate)}<small>{trip.returnPrice != null ? miles.format(trip.returnPrice) : ''}</small></td><td>{trip.nights}</td></>}
+        <td className="num strong">{miles.format(trip.totalPrice)}</td>
         <td className="num">{euros.format(trip.totalTaxes)}</td>
         <td className="num">{euros.format(trip.valueEur)}</td>
       </tr>
@@ -123,12 +123,12 @@ export function ScanResults({ response, request }: { response: TripScanResponse;
       {formatDay(response.from)} to {formatDay(response.to)} · {response.outbound.length} outbound days{oneWay ? '' : ` · ${response.inbound?.length ?? 0} return days`} · {response.requests} Air France calls in {Math.round(response.durationMs / 1000)} s.
       {!oneWay && ' Totals add two one-way awards; check the exact price before booking.'}
     </p>
-    {view === 'miles' && <TripTable trips={response.byMiles} oneWay={oneWay} />}
+    {view === 'miles' && <TripTable trips={response.byPrice} oneWay={oneWay} />}
     {view === 'value' && <TripTable trips={response.byValue} oneWay={oneWay} />}
     {view === 'outbound' && <div className="scan-groups">
       {response.byOutbound.map((group) => (
         <div className="scan-group" key={group.outbound.date}>
-          <div className="scan-group-head"><strong>{formatDay(group.outbound.date)}</strong><span>{miles.format(group.outbound.miles)} miles · {euros.format(group.outbound.taxes ?? 0)}</span></div>
+          <div className="scan-group-head"><strong>{formatDay(group.outbound.date)}</strong><span>{miles.format(group.outbound.price)} miles · {euros.format(group.outbound.taxes ?? 0)}</span></div>
           <TripTable trips={group.returns} oneWay={false} />
         </div>
       ))}
