@@ -7,6 +7,7 @@ import {
 } from './browser-launch.js'
 import { BROWSER_TIMEOUT_MS, COLLECTOR_PAGE, setClientRevision } from './hashes.js'
 import { ORIGIN, SITE_DOMAIN, parseClientRevision } from './market.js'
+import { startCapture } from './capture.js'
 import { restoreSessionCookies, watchSessionCookies } from './session-store.js'
 import { describeAirFranceTransportError, isAirFranceNetworkError } from './transport-errors.js'
 
@@ -34,11 +35,13 @@ const startBrowserContext = async (): Promise<BrowserContext> => {
     context.on('close', () => { contextPromise = undefined })
     await restoreSessionCookies(context, true).catch(() => 0)
     watchSessionCookies(context)
+    startCapture(context)
     return context
   } catch {
     const { context, browser } = await startEphemeralContext()
     await restoreSessionCookies(context, false).catch(() => 0)
     watchSessionCookies(context)
+    startCapture(context)
     ownedBrowser = browser
     browserPromise = Promise.resolve(browser)
     browser.on('disconnected', () => {
