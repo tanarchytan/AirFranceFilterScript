@@ -3,6 +3,7 @@ import { refreshCollectorPage } from './browser.js'
 import {
   BATCH_CONCURRENCY,
   BATCH_SPACING_MS,
+  clientRevision,
   ENDPOINT,
   ENDPOINT_PATH,
   MAX_FETCH_RETRIES,
@@ -30,12 +31,21 @@ interface FetchResult {
   error?: string
 }
 
-const spoofedPath = (queryBookingFlow: BookingFlow): string => (
-  `${ENDPOINT_PATH}?bookingFlow=${queryBookingFlow}&operationName=${SAFE_OPERATION}`
+/**
+ * The live airfrance.nl client names the real operation in the URL; the .nl gateway
+ * answers {"data":{}} when the URL names a different one. AF_SPOOF_OPERATION=1 restores
+ * the old FilterScript behaviour (always the lowest-fare name) for airfrance.fr.
+ */
+const urlOperation = (operationName: string): string => (
+  process.env.AF_SPOOF_OPERATION === '1' ? SAFE_OPERATION : operationName
 )
 
-const spoofedAbsolute = (queryBookingFlow: BookingFlow): string => (
-  `${ENDPOINT}?bookingFlow=${queryBookingFlow}&operationName=${SAFE_OPERATION}`
+const spoofedPath = (queryBookingFlow: BookingFlow, operationName: string): string => (
+  `${ENDPOINT_PATH}?bookingFlow=${queryBookingFlow}&operationName=${urlOperation(operationName)}`
+)
+
+const spoofedAbsolute = (queryBookingFlow: BookingFlow, operationName: string): string => (
+  `${ENDPOINT}?bookingFlow=${queryBookingFlow}&operationName=${urlOperation(operationName)}`
 )
 
 /** Market headers every Air France GQL call needs (missing ones → OFA/TECHNICAL/MISSING_HEADER). */
@@ -65,9 +75,9 @@ const evaluatePageFetch = async (
   options: { queryBookingFlow?: BookingFlow; useRewardHeaders?: boolean; revision?: string },
 ): Promise<FetchResult> => {
   const queryBookingFlow = options.queryBookingFlow ?? 'LEISURE'
-  const headers = options.useRewardHeaders && options.revision
-    ? rewardHeaders(options.revision)
-    : { ...cashHeaders }
+  // The site sends the aviato/revision headers on every call; without them airfrance.nl
+  // answers {"data":{}} (airfrance.fr tolerated their absence for cash).
+  const headers = rewardHeaders(options.revision ?? clientRevision())
 
   return page.evaluate(async ({ url, hdrs, payload, retries, backoff }) => {
     for (let attempt = 0; attempt < retries; attempt += 1) {
@@ -93,7 +103,7 @@ const evaluatePageFetch = async (
     }
     return { ok: false, error: 'fetch retries exhausted' }
   }, {
-    url: spoofedPath(queryBookingFlow),
+    url: spoofedPath(queryBookingFlow, body.operationName),
     hdrs: headers,
     payload: body,
     retries: MAX_FETCH_RETRIES,
@@ -108,9 +118,9 @@ const evaluateIframeFetch = async (
   options: { queryBookingFlow?: BookingFlow; useRewardHeaders?: boolean; revision?: string },
 ): Promise<FetchResult> => {
   const queryBookingFlow = options.queryBookingFlow ?? 'LEISURE'
-  const headers = options.useRewardHeaders && options.revision
-    ? rewardHeaders(options.revision)
-    : { ...cashHeaders }
+  // The site sends the aviato/revision headers on every call; without them airfrance.nl
+  // answers {"data":{}} (airfrance.fr tolerated their absence for cash).
+  const headers = rewardHeaders(options.revision ?? clientRevision())
 
   return page.evaluate(async ({ url, hdrs, payload, retries, backoff }) => {
     const frame = document.createElement('iframe')
@@ -145,7 +155,7 @@ const evaluateIframeFetch = async (
       frame.remove()
     }
   }, {
-    url: spoofedAbsolute(queryBookingFlow),
+    url: spoofedAbsolute(queryBookingFlow, body.operationName),
     hdrs: headers,
     payload: body,
     retries: MAX_FETCH_RETRIES,

@@ -32,16 +32,19 @@ export const FILTERSCRIPT_LOWEST_FARE_HASH =
 export const FILTERSCRIPT_AVAILABLE_OFFERS_HASH =
   '6c2316d35d088fdd0d346203ec93cec7eea953752ff2fc18a759f9f2ba7b690a'
 
-/** Ratline Aug 2026 hashes — fallback / Reward default. */
+/**
+ * Live hashes (airfrance.nl bundle, 2026-10-08). An unknown hash is answered with
+ * {"data":{}} rather than PersistedQueryNotFound, so stale ones fail silently.
+ */
 export const RATLINE_LOWEST_FARE_HASH =
   'da21c63708940f578da4e9fb30c1fdf41ae6e7bf4fe8851257c351d66b5dff80'
 export const RATLINE_AVAILABLE_OFFERS_HASH =
-  '6fc9f9d92bb3fe738cd47068a41ed2170d207876084cc71e21b8e72bbeb7712f'
+  '2fefa196c99a8c9847e453d4611888d114e5e7780bfc3f7670d47c598d935795'
 
 export const LOWEST_FARE_HASH = process.env.AF_LOWEST_FARE_HASH
-  ?? FILTERSCRIPT_LOWEST_FARE_HASH
+  ?? RATLINE_LOWEST_FARE_HASH
 export const AVAILABLE_OFFERS_HASH = process.env.AF_AVAILABLE_OFFERS_HASH
-  ?? FILTERSCRIPT_AVAILABLE_OFFERS_HASH
+  ?? RATLINE_AVAILABLE_OFFERS_HASH
 
 export const CACHE_TTL_MS = 120_000
 export const BROWSER_TIMEOUT_MS = 60_000
