@@ -548,7 +548,7 @@ function App() {
   const [response, setResponse] = useState<SearchResponse>()
   const [exploreResponse, setExploreResponse] = useState<ExploreResponse>()
   const [searchMode, setSearchMode] = useState<SearchMode>('search')
-  const [scanSettings, setScanSettings] = useState<ScanSettings>({ period: 'quarter', stayNights: null })
+  const [scanSettings, setScanSettings] = useState<ScanSettings>({ paymentMode: 'miles', period: 'quarter', stayNights: null })
   const [scanResponse, setScanResponse] = useState<TripScanResponse>()
   const [scanProgress, setScanProgress] = useState<ScanProgress>()
   const [explorePaymentMode, setExplorePaymentMode] = useState<'cash' | 'both'>('cash')
@@ -760,7 +760,7 @@ function App() {
     const controller = new AbortController()
     searchController.current = controller
     setSearchMode('scan')
-    if (!await ensureFlyingBlueSession()) return
+    if (scanSettings.paymentMode === 'miles' && !await ensureFlyingBlueSession()) return
     setLoading(true)
     setElapsed(0)
     setError(undefined)
@@ -773,6 +773,7 @@ function App() {
           origin: request.origin,
           destination: request.destination,
           tripType: request.tripType,
+          paymentMode: scanSettings.paymentMode,
           adults: request.adults,
           cabins: request.cabins.slice(0, 1),
           period: scanSettings.period,
@@ -982,12 +983,12 @@ function App() {
             <div>
               <span className="eyebrow">{request.origin.cityName || 'Origin'} to {request.destination.cityName || 'destination'}</span>
               <h2>{searchMode === 'scan'
-                ? scanResponse ? `${scanResponse.byPrice.length} best trips` : 'Miles trip scanner'
+                ? scanResponse ? `${scanResponse.outbound.length} days scanned` : 'Trip scanner'
                 : searchMode === 'explore'
                 ? exploreResponse ? `${exploreResponse.months.length} months compared` : 'Yearly euros + Miles radar'
                 : response ? `${ranked.length} Air France itineraries` : 'Live comparison cockpit'}</h2>
               <p>{searchMode === 'scan'
-                ? `Flying Blue · ${request.tripType === 'oneway' ? 'one-way' : 'return'} · ${request.adults} adult${request.adults > 1 ? 's' : ''} · ${cabinLabels[request.cabins[0]]}`
+                ? `${scanSettings.paymentMode === 'cash' ? 'Euro fares' : 'Flying Blue'} · ${request.tripType === 'oneway' ? 'one-way' : 'return'} · ${request.adults} adult${request.adults > 1 ? 's' : ''} · ${cabinLabels[request.cabins[0]]}`
                 : searchMode === 'explore'
                 ? `Top 3 return prices per month · ${explorePaymentMode === 'both' ? 'Euros + Miles' : 'Euros'} · Economy · 1 adult`
                 : <>{readableDate(request.departureDate)}{request.tripType === 'oneway' ? ' · one-way' : ` · ${readableDate(request.returnDate)}`}{request.flexibleDays ? ` · ±${request.flexibleDays} d${request.tripType === 'oneway' ? '' : ` · stay ${request.tripLengthDays} d`}` : ''} · {request.adults} traveller{request.adults > 1 ? 's' : ''} · {request.cabins.map((cabin) => cabinLabels[cabin]).join(', ')}</>}</p>
@@ -1001,7 +1002,7 @@ function App() {
           <AuthPrompt visible={!loading && needsFlyingBlueAuth} onConfirmed={onFlyingBlueConfirmed} />
           {(error || nonAuthWarnings?.length) ? <div className={`status-banner ${error || (searchMode === 'explore' ? exploreResponse?.status : response?.status) === 'blocked' ? 'is-error' : ''}`}><CircleAlert size={17} /><span>{error ?? nonAuthWarnings?.[0]}</span>{error && <button type="button" title="Close" onClick={() => setError(undefined)}><X size={15} /></button>}</div> : null}
 
-          {searchMode === 'scan' && scanResponse && <ScanResults response={scanResponse} request={request} />}
+          {searchMode === 'scan' && scanResponse && <ScanResults response={scanResponse} request={request} stayNights={request.tripType === 'return' ? scanSettings.stayNights : null} />}
 
           {searchMode === 'explore' && exploreResponse && exploreResponse.months.length > 0 && <ExploreCalendar response={exploreResponse} paymentMode={explorePaymentMode} onSelect={selectExploreFare} />}
 
