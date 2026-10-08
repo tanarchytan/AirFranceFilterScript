@@ -1,7 +1,7 @@
 import cors from '@fastify/cors'
 import Fastify from 'fastify'
 import { z } from 'zod'
-import type { ExploreMonthItem, FareCalendarItem, MonthlyFareItem, RawOffer, SearchRequest, Station } from '../src/types.js'
+import type { ExploreMonthItem, FareCalendarItem, MonthlyFareItem, RawOffer, SearchRequest, Station, TripScanRequest } from '../src/types.js'
 import {
   confirmFlyingBlueSession,
   exploreCashFares,
@@ -17,6 +17,7 @@ import {
 import { getAirFranceStations } from './airfrance.js'
 import { describeAirFranceTransportError } from './af/transport-errors.js'
 import { isAllowedOrigin, isLocalHost } from './local-guard.js'
+import { scanRewardTrips } from './af/trip-scan-run.js'
 
 const app = Fastify({ logger: true })
 await app.register(cors, { origin: (origin, done) => done(null, isAllowedOrigin(origin)) })
@@ -47,6 +48,17 @@ const requestSchema = z.object({
   nearbyAirports: z.boolean(),
   separateTickets: z.boolean(),
   longLayover: z.boolean(),
+  mileValueCents: z.number().min(0.1).max(10),
+})
+
+const scanSchema = z.object({
+  origin: stationSchema,
+  destination: stationSchema,
+  tripType: z.enum(['return', 'oneway']).default('return'),
+  adults: z.number().int().min(1).max(9),
+  cabins: z.array(z.enum(['ECONOMY', 'PREMIUM', 'BUSINESS'])).min(1),
+  period: z.enum(['month', 'quarter', 'year', '12m']),
+  stayNights: z.number().int().min(1).max(60).nullable(),
   mileValueCents: z.number().min(0.1).max(10),
 })
 
@@ -197,6 +209,23 @@ app.get('/api/stations', async (request, reply) => {
     })
     .slice(0, 12)
   return { source: 'live', results }
+})
+
+app.post('/api/scan', async (request, reply) => {
+  const parsed = scanSchema.safeParse(request.body)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    return reply.status(400).send({ error: `Invalid scan · ${issue?.path.join('.') || 'parameter'}: ${issue?.message ?? 'bad value'}` })
+  }
+  try {
+    return await scanRewardTrips(parsed.data as TripScanRequest)
+  } catch (error) {
+    if (error instanceof FlyingBlueAuthError) {
+      return reply.status(401).send({ authRequired: true, error: 'Log in to Flying Blue in Chrome, then scan again.' })
+    }
+    request.log.warn(error, 'Trip scan failed')
+    return reply.status(503).send({ error: describeAirFranceTransportError(error) })
+  }
 })
 
 app.post('/api/explore', async (request, reply) => {

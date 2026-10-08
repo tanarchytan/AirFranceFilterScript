@@ -160,3 +160,50 @@ export interface SearchResponse {
     candidatePairs: number
   }
 }
+
+export type ScanPeriod = 'month' | 'quarter' | 'year' | '12m'
+
+export interface DayFare {
+  date: string
+  miles: number
+  taxes?: number
+}
+
+export interface TripOption {
+  outboundDate: string
+  returnDate?: string
+  nights?: number
+  outboundMiles: number
+  returnMiles?: number
+  totalMiles: number
+  totalTaxes: number
+  /** Miles at the chosen mile value plus taxes, in euros. */
+  valueEur: number
+}
+
+export interface TripScanRequest {
+  origin: Station
+  destination: Station
+  tripType: TripType
+  adults: number
+  cabins: Cabin[]
+  period: ScanPeriod
+  /** null = any stay length (1 to 60 nights). */
+  stayNights: number | null
+  mileValueCents: number
+}
+
+export interface TripScanResponse {
+  from: string
+  to: string
+  outbound: DayFare[]
+  inbound?: DayFare[]
+  byMiles: TripOption[]
+  byValue: TripOption[]
+  /** Cheapest outbound days, each with its cheapest returns. */
+  byOutbound: Array<{ outbound: DayFare; returns: TripOption[] }>
+  requests: number
+  durationMs: number
+  authRequired?: boolean
+  error?: string
+}
