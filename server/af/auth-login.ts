@@ -14,6 +14,8 @@ import type { SearchCustomerPayload } from './types.js'
 /** Air France account gateway — redirects to KLM IdP / OTP when needed. */
 export const FLYING_BLUE_LOGIN_URL = `${ORIGIN}/identification`
 
+let lastCustomerPayload = ''
+
 const probeCustomer = async (page: Page): Promise<boolean> => {
   const payload = await postGraphQl<SearchCustomerPayload>(
     page,
@@ -22,6 +24,7 @@ const probeCustomer = async (page: Page): Promise<boolean> => {
     { expand: 'memberships_flyingblue' },
     { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
   )
+  lastCustomerPayload = JSON.stringify(payload.data ?? null)
   const authenticated = Boolean(payload.data && !Object.values(payload.data).every((value) => value == null))
   // Best effort: a failed write only means logging in again after the next restart.
   if (authenticated) await saveSessionCookies(page.context()).catch(() => undefined)
@@ -77,7 +80,7 @@ export const confirmFlyingBlueSession = async (): Promise<{
     const cookieCount = cookies.filter((cookie) => /airfrance/i.test(cookie.domain)).length
     try {
       const authenticated = await probeCustomer(page)
-      return { authenticated, cookieCount, url: page.url(), ...(authenticated ? {} : { detail: 'SearchCustomer returned no customer' }) }
+      return { authenticated, cookieCount, url: page.url(), ...(authenticated ? {} : { detail: `SearchCustomer returned ${lastCustomerPayload.slice(0, 400)}` }) }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       if (error instanceof FlyingBlueAuthError || /401|not authenticated|Flying Blue|CustomerAPI/i.test(message)) {
