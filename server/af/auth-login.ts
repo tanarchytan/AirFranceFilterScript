@@ -31,6 +31,36 @@ const probeCustomer = async (page: Page): Promise<boolean> => {
   return authenticated
 }
 
+/** The site's own login probe: {"isLoggedIn":true|false,...}. Only answerable on our origin. */
+const oauthLoggedIn = async (page: Page): Promise<boolean> => {
+  if (!page.url().startsWith(ORIGIN)) return false
+  return page.evaluate(async () => {
+    const response = await fetch('/endpoint/v1/oauth/login', { credentials: 'include', headers: { accept: 'application/json' } })
+    if (!response.ok) return false
+    const body = await response.json() as { isLoggedIn?: boolean }
+    return body.isLoggedIn === true
+  }).catch(() => false)
+}
+
+const SILENT_LOGIN_WAIT_MS = 20_000
+
+/**
+ * Air France's own session ends after a few hours, but the identity site's long-lived
+ * single sign-on cookie (KLMCOM.SSOCOOKIE) logs straight back in through the OAuth
+ * redirect, no password or code. Returns false when the user must log in by hand.
+ */
+export const silentRelogin = async (page: Page): Promise<boolean> => {
+  await navigateAirFrance(page, FLYING_BLUE_LOGIN_URL, 1_200).catch(() => undefined)
+  const deadline = Date.now() + SILENT_LOGIN_WAIT_MS
+  let loggedIn = false
+  while (!loggedIn && Date.now() < deadline) {
+    await page.waitForTimeout(1_000)
+    loggedIn = await oauthLoggedIn(page)
+  }
+  await navigateAirFrance(page, COLLECTOR_PAGE, 1_200)
+  return loggedIn
+}
+
 const restoreCollectorPage = async (page: Page): Promise<void> => {
   if (page.url().includes('/search/')) return
   await navigateAirFrance(page, COLLECTOR_PAGE, 1_200)
@@ -52,7 +82,8 @@ export const isFlyingBlueAuthenticated = async (): Promise<boolean> => withTrans
   withRecoveredCollector(async (page) => {
     try {
       await restoreCollectorPage(page)
-      return await probeCustomer(page)
+      if (await probeCustomer(page).catch(() => false)) return true
+      return await silentRelogin(page) && await probeCustomer(page)
     } catch (error) {
       if (error instanceof FlyingBlueAuthError) return false
       const message = error instanceof Error ? error.message : String(error)

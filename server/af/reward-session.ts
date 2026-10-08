@@ -10,6 +10,7 @@ import {
   SEARCH_CUSTOMER_HASH,
 } from './hashes.js'
 import { FlyingBlueAuthError } from './hashcash.js'
+import { silentRelogin } from './auth-login.js'
 import { saveSessionCookies } from './session-store.js'
 import { postGraphQlWithRetry } from './transport.js'
 import type {
@@ -61,13 +62,8 @@ const ensureCollectorPage = async (page: Page): Promise<void> => {
   await navigateAirFrance(page, COLLECTOR_PAGE, 1_500)
 }
 
-/** Auth + CreateSearchContext traveler keys + ContextPassengers. */
-export const prepareRewardSession = async (
-  page: Page,
-  request: SearchRequest,
-): Promise<RewardSession> => {
-  const searchStateUuid = randomUUID()
-  await ensureCollectorPage(page)
+/** SearchCustomer must name a customer; throws FlyingBlueAuthError otherwise. */
+const requireCustomer = async (page: Page): Promise<void> => {
   try {
     const payload = await postGraphQlWithRetry<SearchCustomerPayload>(
       page,
@@ -88,6 +84,22 @@ export const prepareRewardSession = async (
       throw new FlyingBlueAuthError(message)
     }
     throw error
+  }
+}
+
+/** Auth + CreateSearchContext traveler keys + ContextPassengers. */
+export const prepareRewardSession = async (
+  page: Page,
+  request: SearchRequest,
+): Promise<RewardSession> => {
+  const searchStateUuid = randomUUID()
+  await ensureCollectorPage(page)
+  try {
+    await requireCustomer(page)
+  } catch (error) {
+    // Expired Air France session: one silent single-sign-on round trip, then retry once.
+    if (!(error instanceof FlyingBlueAuthError) || !await silentRelogin(page)) throw error
+    await requireCustomer(page)
   }
 
   let context: CreateSearchContextPayload
