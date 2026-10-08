@@ -1,6 +1,7 @@
 import type { Station } from '../src/types.js'
 import { withRecoveredCollector, withTransportLock } from './af/browser.js'
 import { MARKET } from './af/market.js'
+import { cashHeaders } from './af/transport.js'
 
 const REFERENCE_HASH = 'c11344fdd1be05827219b57614c2a6a9dfc88a3da3b8c0fd11cbf48443ff6acb'
 const STATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000
@@ -9,6 +10,7 @@ interface ReferenceResponse {
   data?: {
     flatStations?: Station[]
   }
+  errors?: { message?: string }[]
 }
 
 let stationCache: { stations: Station[]; expiresAt: number } | undefined
@@ -29,10 +31,10 @@ export const stationReferencePath = (): string => {
  */
 const getJsonViaBrowser = async <T>(path: string): Promise<T> => (
   withTransportLock(() => withRecoveredCollector(async (page) => {
-    const result = await page.evaluate(async (url) => {
-      const response = await fetch(url, { credentials: 'include', headers: { accept: 'application/json' } })
+    const result = await page.evaluate(async ({ url, headers }) => {
+      const response = await fetch(url, { credentials: 'include', headers })
       return { status: response.status, text: await response.text() }
-    }, path)
+    }, { url: path, headers: { ...cashHeaders } })
     if (result.status !== 200) throw new Error(`Station reference HTTP ${result.status}`)
     return JSON.parse(result.text) as T
   }))
@@ -43,7 +45,11 @@ let stationLoad: Promise<Station[]> | undefined
 const loadStations = async (): Promise<Station[]> => {
   const payload = await getJsonViaBrowser<ReferenceResponse>(stationReferencePath())
   const stations = payload.data?.flatStations
-  if (!stations?.length) throw new Error('Air France station reference is empty')
+  if (!stations?.length) {
+    const detail = payload.errors?.map((error) => error.message).filter(Boolean).join('; ')
+      || JSON.stringify(payload).slice(0, 300)
+    throw new Error(`Air France station reference is empty: ${detail}`)
+  }
   stationCache = { stations, expiresAt: Date.now() + STATION_CACHE_TTL_MS }
   return stations
 }

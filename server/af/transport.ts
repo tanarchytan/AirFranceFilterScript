@@ -38,7 +38,8 @@ const spoofedAbsolute = (queryBookingFlow: BookingFlow): string => (
   `${ENDPOINT}?bookingFlow=${queryBookingFlow}&operationName=${SAFE_OPERATION}`
 )
 
-const cashHeaders = {
+/** Market headers every Air France GQL call needs (missing ones → OFA/TECHNICAL/MISSING_HEADER). */
+export const cashHeaders = {
   accept: 'application/json, text/plain, */*',
   'content-type': 'application/json',
   'afkl-travel-country': MARKET.country,
