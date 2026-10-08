@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthPrompt } from './AuthPrompt'
-import { initialScanSettings, ScanControls, ScanResults, type ScanSettings } from './ScanPanel'
+import { ScanControls, ScanResults, type ScanSettings } from './ScanPanel'
 import { formatDuration, rankOffers } from './lib/optimizer'
 import { matchStationQuery, stationLabel } from './lib/stations'
 import type { Cabin, ExploreFare, ExploreResponse, RankedOffer, SearchRequest, SearchResponse, Station, TripScanResponse } from './types'
@@ -537,7 +537,7 @@ function App() {
   const [response, setResponse] = useState<SearchResponse>()
   const [exploreResponse, setExploreResponse] = useState<ExploreResponse>()
   const [searchMode, setSearchMode] = useState<SearchMode>('search')
-  const [scanSettings, setScanSettings] = useState<ScanSettings>(initialScanSettings)
+  const [scanSettings, setScanSettings] = useState<ScanSettings>({ period: 'quarter', stayNights: null })
   const [scanResponse, setScanResponse] = useState<TripScanResponse>()
   const [explorePaymentMode, setExplorePaymentMode] = useState<'cash' | 'both'>('cash')
   const [flyingBlueReady, setFlyingBlueReady] = useState(false)

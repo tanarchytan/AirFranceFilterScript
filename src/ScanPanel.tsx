@@ -8,8 +8,6 @@ export interface ScanSettings {
   stayNights: number | null
 }
 
-export const initialScanSettings: ScanSettings = { period: 'quarter', stayNights: null }
-
 const periods: Array<[ScanPeriod, string]> = [['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year'], ['12m', '12 months']]
 const stayPresets: Array<number | null> = [null, 7, 14, 21, 30]
 const cabinLabels: Record<Cabin, string> = { ECONOMY: 'Economy', PREMIUM: 'Premium', BUSINESS: 'Business' }
