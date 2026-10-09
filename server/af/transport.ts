@@ -61,7 +61,8 @@ export const cashHeaders = {
   language: MARKET.language,
 } as const
 
-const rewardHeaders = (revision: string) => ({
+/** Headers the live client sends on every GraphQL call. */
+export const siteHeaders = (revision: string) => ({
   ...cashHeaders,
   'accept-language': MARKET.acceptLanguage,
   'x-aviato-host': MARKET.host,
@@ -78,7 +79,7 @@ const evaluatePageFetch = async (
   const queryBookingFlow = options.queryBookingFlow ?? 'LEISURE'
   // The site sends the aviato/revision headers on every call; without them airfrance.nl
   // answers {"data":{}} (airfrance.fr tolerated their absence for cash).
-  const headers = rewardHeaders(options.revision ?? clientRevision())
+  const headers = siteHeaders(options.revision ?? clientRevision())
 
   return page.evaluate(async ({ url, hdrs, payload, retries, backoff }) => {
     for (let attempt = 0; attempt < retries; attempt += 1) {
@@ -121,7 +122,7 @@ const evaluateIframeFetch = async (
   const queryBookingFlow = options.queryBookingFlow ?? 'LEISURE'
   // The site sends the aviato/revision headers on every call; without them airfrance.nl
   // answers {"data":{}} (airfrance.fr tolerated their absence for cash).
-  const headers = rewardHeaders(options.revision ?? clientRevision())
+  const headers = siteHeaders(options.revision ?? clientRevision())
 
   return page.evaluate(async ({ url, hdrs, payload, retries, backoff }) => {
     const frame = document.createElement('iframe')

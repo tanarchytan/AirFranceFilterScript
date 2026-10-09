@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cookiesToRestore, cookiesToSave, sessionSignature } from './session-store.js'
+import { cookieJarSignature, cookiesToRestore, cookiesToSave, sessionSignature } from './session-store.js'
 
 const cookie = (name: string, domain: string, expires: number) => ({
   name, value: 'v', domain, path: '/', expires, httpOnly: true, secure: true, sameSite: 'Lax' as const,
@@ -40,5 +40,11 @@ describe('session-store', () => {
       cookie('stale', '.airfrance.nl', 1_700_000_000),
     ], { persistentProfile: false, nowSeconds: 1_800_000_000 })
     expect(restored.map((item) => item.name)).toEqual(['aviato_sso_sessionid', 'fresh'])
+  })
+
+  it('jar signature changes when Akamai rotates a persistent cookie', () => {
+    const before = [cookie('_abck', '.airfrance.nl', 2_000_000_000)]
+    expect(cookieJarSignature(before)).not.toBe(cookieJarSignature([{ ...before[0], value: 'rotated' }]))
+    expect(cookieJarSignature([cookie('_ga', '.google.com', -1)])).toBe('')
   })
 })

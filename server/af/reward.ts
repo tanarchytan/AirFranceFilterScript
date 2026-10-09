@@ -9,6 +9,7 @@ import {
 } from './hashes.js'
 import { FlyingBlueAuthError } from './hashcash.js'
 import { parseAvailableOffers, parseMonthlyFares, selectExactCandidates } from './parsers.js'
+import { browserClient } from './gql-client.js'
 import { prepareRewardSession, rewardTransportOptions } from './reward-session.js'
 import { buildGraphQlBody, postGraphQlBatch, postGraphQlWithRetry } from './transport.js'
 import type { AvailableOffersPayload, LowestFarePayload, SearchCapture } from './types.js'
@@ -41,7 +42,7 @@ const executeRewardSearch = async (request: SearchRequest): Promise<SearchCaptur
       ...(request.flexibleDays ? ['SharedSearchLowestFareOffersForSearchQuery:DAY'] : []),
       'SearchResultAvailableOffersQuery',
     ]
-    const { searchStateUuid, companions } = await prepareRewardSession(page, request)
+    const { searchStateUuid, companions } = await prepareRewardSession(browserClient(page), request)
     const [firstMonthDate, lastMonthDate] = monthlyInterval(request.departureDate)
     const monthlyPayload = await postGraphQlWithRetry<LowestFarePayload>(
       page,

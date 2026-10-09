@@ -219,6 +219,10 @@ export interface TripScanResponse {
   byOutbound: Array<{ outbound: DayFare; returns: TripOption[] }>
   requests: number
   durationMs: number
+  /** http = impit with saved cookies (no browser), browser = Patchright fallback. */
+  transport?: 'http' | 'browser'
+  /** Why the browserless attempt was abandoned, when it was. */
+  fallbackReason?: string
   authRequired?: boolean
   error?: string
 }

@@ -3,6 +3,7 @@ import { withRecoveredCollector, withTransportLock } from './browser.js'
 import { loadExploreMonthsFromHorizon } from './explore-chunks.js'
 import { CACHE_TTL_MS, RATLINE_LOWEST_FARE_HASH } from './hashes.js'
 import { parseMonthlyFares } from './parsers.js'
+import { browserClient } from './gql-client.js'
 import { prepareRewardSession, rewardTransportOptions } from './reward-session.js'
 import { warmAkamaiSession } from './session-warm.js'
 import { postGraphQlWithRetry } from './transport.js'
@@ -27,7 +28,7 @@ const executeRewardExplore = async (request: SearchRequest): Promise<ExploreCapt
       'SharedSearchLowestFareOffersForSearchQuery:MONTH',
       'SharedSearchLowestFareOffersForSearchQuery:DAY',
     ]
-    const { searchStateUuid, companions } = await prepareRewardSession(page, request)
+    const { searchStateUuid, companions } = await prepareRewardSession(browserClient(page), request)
     const [firstMonthDate, lastMonthDate] = monthlyInterval(request.departureDate)
     const monthlyPayload = await postGraphQlWithRetry<LowestFarePayload>(
       page,

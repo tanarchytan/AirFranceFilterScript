@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { BrowserContext, Cookie } from 'patchright'
+import { clientRevision } from './hashes.js'
 import { SITE_DOMAIN } from './market.js'
 
 /**
@@ -35,6 +36,12 @@ export const sessionSignature = (cookies: Cookie[]): string => cookiesToSave(coo
   .sort()
   .join('\n')
 
+/** Every Air France cookie value; Akamai rotates _abck / bm_sv as the browser runs. */
+export const cookieJarSignature = (cookies: Cookie[]): string => cookiesToSave(cookies)
+  .map((cookie) => `${cookie.domain}|${cookie.name}|${cookie.value}`)
+  .sort()
+  .join('\n')
+
 const WATCH_INTERVAL_MS = 3_000
 
 /**
@@ -45,7 +52,9 @@ export const watchSessionCookies = (context: BrowserContext): void => {
   let lastSignature = ''
   const timer = setInterval(() => {
     void context.cookies().then(async (cookies) => {
-      const signature = sessionSignature(cookies)
+      // Save on any change, not just the login: the browserless client needs Akamai
+      // cookies the browser renewed moments ago (they stop working ~10-20 min later).
+      const signature = cookieJarSignature(cookies)
       if (!signature || signature === lastSignature) return
       await saveSessionCookies(context)
       lastSignature = signature
@@ -58,7 +67,22 @@ export const watchSessionCookies = (context: BrowserContext): void => {
 export const saveSessionCookies = async (context: BrowserContext): Promise<void> => {
   const cookies = cookiesToSave(await context.cookies())
   if (!cookies.length) return
-  await writeFile(SESSION_FILE, JSON.stringify({ savedAt: new Date().toISOString(), cookies }), { mode: 0o600 })
+  // Revision and user agent let the browserless client look like the browser that made the
+  // cookies (Akamai ties _abck to the browser that earned it).
+  const page = context.pages()[0]
+  const userAgent = page ? await page.evaluate(() => navigator.userAgent).catch(() => undefined) : undefined
+  await writeFile(SESSION_FILE, JSON.stringify({ savedAt: new Date().toISOString(), revision: clientRevision(), userAgent, cookies }), { mode: 0o600 })
+}
+
+/** Fold cookie updates the browserless client received back into the saved session. */
+export const mergeSavedCookies = async (updates: Array<{ name: string; value: string }>): Promise<void> => {
+  if (!updates.length) return
+  const saved = JSON.parse(await readFile(SESSION_FILE, 'utf8')) as { cookies?: Cookie[] }
+  const byName = new Map(updates.map((cookie) => [cookie.name, cookie.value]))
+  const cookies = (saved.cookies ?? []).map((cookie) => (
+    cookie.domain.replace(/^\./, '').endsWith(SITE_DOMAIN) && byName.has(cookie.name) ? { ...cookie, value: byName.get(cookie.name)! } : cookie
+  ))
+  await writeFile(SESSION_FILE, JSON.stringify({ ...saved, cookies }), { mode: 0o600 })
 }
 
 export const restoreSessionCookies = async (

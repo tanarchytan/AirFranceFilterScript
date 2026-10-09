@@ -3,7 +3,6 @@ import type { Page } from 'patchright'
 import type { SearchRequest } from '../../src/types.js'
 import { navigateAirFrance, refreshCollectorPage } from './browser.js'
 import {
-  clientRevision,
   COLLECTOR_PAGE,
   CONTEXT_PASSENGERS_HASH,
   CREATE_SEARCH_CONTEXT_HASH,
@@ -12,7 +11,7 @@ import {
 import { FlyingBlueAuthError } from './hashcash.js'
 import { silentRelogin } from './auth-login.js'
 import { saveSessionCookies } from './session-store.js'
-import { postGraphQlWithRetry } from './transport.js'
+import type { GqlClient } from './gql-client.js'
 import type {
   CreateSearchContextPayload,
   RewardSession,
@@ -21,11 +20,11 @@ import type {
 } from './types.js'
 import { contextPassengersVariables } from './variables.js'
 
+/** No fixed revision here: headers read the live one per call (it is captured after startup). */
 export const rewardTransportOptions = {
   withHashcash: true,
   queryBookingFlow: 'LEISURE' as const,
   useRewardHeaders: true,
-  revision: clientRevision(),
 }
 
 const normalizeTravelers = (raw: unknown): Array<{ travelerKey?: number; travelerSource?: string }> => {
@@ -63,20 +62,19 @@ const ensureCollectorPage = async (page: Page): Promise<void> => {
 }
 
 /** SearchCustomer must name a customer; throws FlyingBlueAuthError otherwise. */
-const requireCustomer = async (page: Page): Promise<void> => {
+const requireCustomer = async (client: GqlClient): Promise<void> => {
   try {
-    const payload = await postGraphQlWithRetry<SearchCustomerPayload>(
-      page,
+    const payload = await client.post<SearchCustomerPayload>(
       'SearchCustomerForSearchQuery',
       SEARCH_CUSTOMER_HASH,
       { expand: 'memberships_flyingblue' },
-      { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
+      { withHashcash: false, useRewardHeaders: true },
     )
     if (!payload.data || Object.values(payload.data).every((value) => value == null)) {
       throw new FlyingBlueAuthError()
     }
     // Best effort: refresh the saved login so it survives the next API restart.
-    await saveSessionCookies(page.context()).catch(() => undefined)
+    if (client.page) await saveSessionCookies(client.page.context()).catch(() => undefined)
   } catch (error) {
     if (error instanceof FlyingBlueAuthError) throw error
     const message = error instanceof Error ? error.message : String(error)
@@ -89,32 +87,32 @@ const requireCustomer = async (page: Page): Promise<void> => {
 
 /** Auth + CreateSearchContext traveler keys + ContextPassengers. */
 export const prepareRewardSession = async (
-  page: Page,
+  client: GqlClient,
   request: SearchRequest,
 ): Promise<RewardSession> => {
   const searchStateUuid = randomUUID()
-  await ensureCollectorPage(page)
+  const page = client.page
+  if (page) await ensureCollectorPage(page)
   try {
-    await requireCustomer(page)
+    await requireCustomer(client)
   } catch (error) {
-    // Expired Air France session: one silent single-sign-on round trip, then retry once.
-    if (!(error instanceof FlyingBlueAuthError) || !await silentRelogin(page)) throw error
-    await requireCustomer(page)
+    // Expired Air France session: one silent single-sign-on round trip (browser only), then retry once.
+    if (!(error instanceof FlyingBlueAuthError) || !page || !await silentRelogin(page)) throw error
+    await requireCustomer(client)
   }
 
   let context: CreateSearchContextPayload
   try {
-    context = await postGraphQlWithRetry<CreateSearchContextPayload>(
-      page,
+    context = await client.post<CreateSearchContextPayload>(
       'SharedSearchCreateSearchContextForSearchQuery',
       CREATE_SEARCH_CONTEXT_HASH,
       { searchStateUuid },
-      { withHashcash: false, useRewardHeaders: true, revision: clientRevision() },
+      { withHashcash: false, useRewardHeaders: true },
     )
-  } catch {
+  } catch (error) {
+    if (!page) throw error
     await refreshCollectorPage(page)
-    context = await postGraphQlWithRetry<CreateSearchContextPayload>(
-      page,
+    context = await client.post<CreateSearchContextPayload>(
       'SharedSearchCreateSearchContextForSearchQuery',
       CREATE_SEARCH_CONTEXT_HASH,
       { searchStateUuid },
@@ -126,8 +124,7 @@ export const prepareRewardSession = async (
     request.adults,
   )
 
-  await postGraphQlWithRetry(
-    page,
+  await client.post(
     'SharedSearchContextPassengersForSearchQuery',
     CONTEXT_PASSENGERS_HASH,
     contextPassengersVariables(request, searchStateUuid, 'REWARD', companions),
