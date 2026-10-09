@@ -13,6 +13,7 @@ import {
 import { graphQlErrorMessage, solveHashcash } from './hashcash.js'
 import { markSessionWarm } from './session-state.js'
 import { MARKET } from './market.js'
+import { isBlockError, sourceCooldowns } from '../source-cooldown.js'
 import type { BookingFlow } from './types.js'
 
 export interface GraphQlBody {
@@ -224,16 +225,21 @@ export const postGraphQlWithRetry = async <T>(
   variables: Record<string, unknown>,
   options: Parameters<typeof postGraphQl>[4] = {},
 ): Promise<T> => {
+  sourceCooldowns.assertAvailable('airfrance', 'Air France')
   let lastError: unknown
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await postGraphQl<T>(page, operationName, persistedQueryHash, variables, options)
+      const result = await postGraphQl<T>(page, operationName, persistedQueryHash, variables, options)
+      sourceCooldowns.recordSuccess('airfrance')
+      return result
     } catch (error) {
       lastError = error
       await refreshCollectorPage(page)
       await page.waitForTimeout(4_000 * (attempt + 1))
     }
   }
+  // Still blocked after reloads: stop asking for a while instead of extending the block.
+  if (isBlockError(lastError)) sourceCooldowns.recordBlock('airfrance')
   throw lastError instanceof Error ? lastError : new Error(String(lastError))
 }
 
