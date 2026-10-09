@@ -15,6 +15,10 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     port: 5173,
+    // Chrome writes HTML into its profile dirs; without this Vite full-reloads the page mid-scan.
+    watch: {
+      ignored: ['**/.airfrance-*/**', '**/.finnair-*/**', '**/.airfrance-*', '**/.finnair-*'],
+    },
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8787',
