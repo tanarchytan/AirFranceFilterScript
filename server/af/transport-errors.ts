@@ -16,6 +16,7 @@ export const describeAirFranceTransportError = (error: unknown): string => {
       'Ratline will reset the browser profile if needed.',
       `If Brave opens ${ORIGIN} but Ratline still fails,`,
       'restart the API, or switch network (4G / VPN).',
+      `Cause: ${message.split('\n')[0].slice(0, 160)}`,
     ].join(' ')
   }
   return message.slice(0, 240)
