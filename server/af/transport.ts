@@ -1,5 +1,5 @@
 import type { Page } from 'patchright'
-import { refreshCollectorPage } from './browser.js'
+import { ensureOnSite, refreshCollectorPage } from './browser.js'
 import {
   BATCH_CONCURRENCY,
   BATCH_SPACING_MS,
@@ -202,6 +202,7 @@ export const postGraphQl = async <T>(
     revision?: string
   } = {},
 ): Promise<T> => {
+  await ensureOnSite(page)
   const body = buildGraphQlBody(
     operationName,
     persistedQueryHash,

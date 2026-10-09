@@ -224,6 +224,15 @@ export const withRecoveredCollector = async <T>(work: (page: Page) => Promise<T>
   }
 }
 
+/**
+ * In-page GraphQL calls only work from the Air France origin. The login flow can leave the
+ * tab on the identity site, where a relative /gql/v1 fetch fails ("Failed to fetch").
+ */
+export const ensureOnSite = async (page: Page): Promise<void> => {
+  if (page.url().startsWith(`${ORIGIN}/`)) return
+  await navigateAirFrance(page, COLLECTOR_PAGE, 1_200)
+}
+
 export const refreshCollectorPage = async (page: Page): Promise<void> => {
   try {
     await page.reload({ waitUntil: 'domcontentloaded', timeout: BROWSER_TIMEOUT_MS })
