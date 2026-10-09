@@ -27,14 +27,14 @@ and upstream-friendly where possible (config via env, defaults unchanged for `fr
 3. [x] One-way: `tripType` in `src/types.ts` + zod schema + builders + parsers.
 4. [x] Miles calendar: Scan trips mode (month/quarter/year/12m, stay length, miles or euros),
        calendar picker with exact flights per leg, rankings, CSV, live progress.
-5. [ ] Backoff: jitter, re-warm after 403, cooldown after repeated 403s.
-6. [ ] Tests (vitest) for each step, typecheck, one live smoke AMS-OSA.
+5. [x] Backoff: re-warm (page reload) after 403, 3 tries with growing wait, source cooldown.
+6. [x] Tests (vitest, 59 passing), typecheck, live smoke AMS-OSA (60,000 mi + EUR 460 one-way, 2 adults).
 
 ## Roadmap (agreed 2026-10-09: "yes to all, always find all the best things")
 
 7. [ ] Finnair adapter (Avios + cash): airCalendar / airBounds from a logged-in finnair.com page
        (server/finnair/; capture, probe and try-calendar tools already there). Airline switch in the UI.
-8. [ ] Source cooldown: on 403/429 pause that source 10 min, doubling up to 1 h (FlightScout pattern).
+8. [x] Source cooldown (server/source-cooldown.ts): on 403/429 pause that source 10 min, doubling up to 1 h (FlightScout pattern).
 9. [ ] "Go somewhere" tab: map + list of destinations, price colours, budget slider, any dates /
        around a date, staged loading. Cash leads from KAYAK Explore / Google Flights Explore;
        miles from Flying Blue MONTH calendars per destination.
