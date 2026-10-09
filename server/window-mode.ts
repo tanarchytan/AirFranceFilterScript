@@ -38,8 +38,19 @@ export const showWindow = async (page: Page): Promise<void> => {
   await page.bringToFront().catch(() => undefined)
 }
 
-/** Put the window back out of sight once the human part is done. */
+/**
+ * Put the window back out of sight once the human part is done. Chrome clamps windows that
+ * are moved off-screen after launch, so minimise it (throttling is disabled via windowArgs).
+ */
 export const hideWindow = async (page: Page): Promise<void> => {
   if (!BACKGROUND_WINDOW) return
-  await moveWindow(page, OFF_SCREEN).catch(() => undefined)
+  const session = await page.context().newCDPSession(page)
+  try {
+    const { windowId } = await session.send('Browser.getWindowForTarget') as { windowId: number }
+    await session.send('Browser.setWindowBounds', { windowId, bounds: { windowState: 'minimized' } })
+  } catch {
+    // Window controls unavailable (e.g. CDP-attached browser): leaving it visible is harmless.
+  } finally {
+    await session.detach().catch(() => undefined)
+  }
 }
