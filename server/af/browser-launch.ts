@@ -3,6 +3,7 @@ import { access, mkdir, rm } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { chromium, type Browser, type BrowserContext } from 'patchright'
 import { MARKET } from './market.js'
+import { windowArgs } from '../window-mode.js'
 
 export const PROFILE_DIR = resolve(process.env.AF_BROWSER_PROFILE ?? '.airfrance-browser-profile')
 
@@ -65,7 +66,7 @@ export const rotateBrokenProfile = async (): Promise<void> => {
   await mkdir(PROFILE_DIR, { recursive: true })
 }
 
-const launchArgs = ['--no-first-run', '--no-default-browser-check']
+const launchArgs = ['--no-first-run', '--no-default-browser-check', ...windowArgs()]
 
 const sharedLaunch = async () => ({
   headless: false,

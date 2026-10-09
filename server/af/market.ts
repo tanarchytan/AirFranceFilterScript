@@ -10,11 +10,13 @@ export interface Market {
   acceptLanguage: string
   locale: string
   timezoneId: string
+  /** Locale segment of the site's OAuth login redirect, e.g. NL/en-US. */
+  loginLocale: string
 }
 
 export const MARKETS = {
-  fr: { host: 'wwws.airfrance.fr', country: 'FR', language: 'fr', acceptLanguage: 'fr', locale: 'fr-FR', timezoneId: 'Europe/Paris' },
-  nl: { host: 'wwws.airfrance.nl', country: 'NL', language: 'en', acceptLanguage: 'en-US', locale: 'en-US', timezoneId: 'Europe/Amsterdam' },
+  fr: { host: 'wwws.airfrance.fr', country: 'FR', language: 'fr', acceptLanguage: 'fr', locale: 'fr-FR', timezoneId: 'Europe/Paris', loginLocale: 'FR/fr-FR' },
+  nl: { host: 'wwws.airfrance.nl', country: 'NL', language: 'en', acceptLanguage: 'en-US', locale: 'en-US', timezoneId: 'Europe/Amsterdam', loginLocale: 'NL/en-US' },
 } as const satisfies Record<string, Market>
 
 export type MarketCode = keyof typeof MARKETS

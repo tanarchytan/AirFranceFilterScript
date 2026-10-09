@@ -6,13 +6,17 @@ import {
   SEARCH_CUSTOMER_HASH,
 } from './hashes.js'
 import { FlyingBlueAuthError } from './hashcash.js'
-import { ORIGIN } from './market.js'
+import { MARKET, ORIGIN } from './market.js'
 import { saveSessionCookies } from './session-store.js'
+import { hideWindow, showWindow } from '../window-mode.js'
 import { postGraphQl } from './transport.js'
 import type { SearchCustomerPayload } from './types.js'
 
-/** Air France account gateway — redirects to KLM IdP / OTP when needed. */
-export const FLYING_BLUE_LOGIN_URL = `${ORIGIN}/identification`
+/**
+ * The site's own login entry: OAuth redirect to the AF/KLM identity site, which signs in
+ * silently when its single sign-on cookie is still valid. (/identification is a 404 on .nl.)
+ */
+export const FLYING_BLUE_LOGIN_URL = `${ORIGIN}/endpoint/v1/oauth/redirect?loginPrompt=&source=search&locale=${MARKET.loginLocale}`
 
 let lastCustomerPayload = ''
 
@@ -67,7 +71,7 @@ const restoreCollectorPage = async (page: Page): Promise<void> => {
 }
 
 export const openFlyingBlueLoginOnPage = async (page: Page): Promise<string> => {
-  await page.bringToFront().catch(() => undefined)
+  await showWindow(page)
   await navigateAirFrance(page, FLYING_BLUE_LOGIN_URL, 1_200)
   await page.bringToFront().catch(() => undefined)
   return page.url()
@@ -111,6 +115,7 @@ export const confirmFlyingBlueSession = async (): Promise<{
     const cookieCount = cookies.filter((cookie) => /airfrance/i.test(cookie.domain)).length
     try {
       const authenticated = await probeCustomer(page)
+      if (authenticated) await hideWindow(page)
       return { authenticated, cookieCount, url: page.url(), ...(authenticated ? {} : { detail: `SearchCustomer returned ${lastCustomerPayload.slice(0, 400)}` }) }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
