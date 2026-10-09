@@ -19,6 +19,7 @@
     "test:live": "tsx server/live-smoke.ts",
     "test:reward": "tsx server/reward-smoke.ts",
     "session:import": "tsx server/import-session.ts",
+    "capture:finnair": "tsx server/finnair/capture.ts",
     "lint": "eslint ."
   },
   "dependencies": {

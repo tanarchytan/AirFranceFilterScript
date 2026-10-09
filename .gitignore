@@ -18,3 +18,8 @@ package-lock.json
 npm-shrinkwrap.json
 
 .airfrance-capture*.jsonl
+.finnair-capture*.jsonl
+.finnair-browser-profile/
+.finnair-probe*.json
+.finnair-probe*.png
+.finnair-calendar-try*.json
